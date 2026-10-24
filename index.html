@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>論証集アプリ v29.10（更新直後に古いプログラムが混ざって動かないよう、読み込み時に毎回更新を確認するよう修正）</title>
+<title>論証集アプリ v29.11（判例の編集欄に見出しを付け、貼り付けた文章の改行を自動でつなげるよう対応）</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0057e7">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@ try {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script><link rel="stylesheet" href="style.css">
 </head>
 <body>
-<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v29.10</span></h1>
+<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v29.11</span></h1>
 <div id="status"></div>
 <div id="syncConflictBanner" class="syncConflictBanner"></div>
 <div id="backupReminderBanner" class="backupReminderBanner"></div>
@@ -252,21 +252,21 @@ try {
 <div class="past-log-small-note">「判例名（判決日）」の見出し行、または「【6-1】基本情報」のような番号付き見出し形式のどちらにも対応しています。「事実（事案）」「判旨」「規範」「解説」「見直し版」「百選」「結論」「特徴（百選的理由）」「出題趣旨・採点実感での言及」などの見出し・箇条書きから、下のフォームへ自動で振り分けます。科目は「科目:」ラベルがあればそれを使い、無ければ本文中の科目名（憲法・民法など）から推測します。振り分け後は必ず内容を確認・修正してから保存してください。</div>
 </div>
 <div class="past-log-header" id="precedentForm">
-<input type="text" id="precedentNameInput" placeholder="判例名（任意）例：三菱樹脂事件" style="width:220px;">
-<input type="text" id="precedentDateInput" placeholder="判決日 例：最大判昭和48年12月12日" style="width:240px;">
-<span>科目：</span>
-<input type="text" id="precedentSubjectInput" placeholder="例：憲法" style="width:110px;" list="subjectSuggestions">
-<input type="text" id="precedentHyakusenInput" placeholder="百選 例：憲法Ⅰ（第8版）81事件（任意）" style="width:260px;">
+<label class="precedentField precedentFieldWide"><span class="precedentFieldLabel">タイトル（判例名）</span><input type="text" id="precedentNameInput" placeholder="例：152　義務的団交事項－根岸病院事件"></label>
+<label class="precedentField precedentFieldWide"><span class="precedentFieldLabel">判決日・出典</span><input type="text" id="precedentDateInput" placeholder="例：東京高判平成19年7月31日〔平成19年(行コ)23号〕"></label>
+<label class="precedentField"><span class="precedentFieldLabel">科目</span><input type="text" id="precedentSubjectInput" placeholder="例：憲法" style="width:110px;" list="subjectSuggestions"></label>
+<label class="precedentField"><span class="precedentFieldLabel">百選（任意）</span><input type="text" id="precedentHyakusenInput" placeholder="例：憲法Ⅰ（第8版）81事件" style="width:220px;"></label>
 </div>
 <div class="past-log-header precedentFormBody" id="precedentFormBody">
-<textarea id="precedentSummaryInput" class="editBodyArea precedentTextarea" placeholder="①事実（事案の概要）"></textarea>
-<textarea id="precedentHoldingInput" class="editBodyArea precedentTextarea" placeholder="②判旨"></textarea>
-<textarea id="precedentNormInput" class="editBodyArea precedentTextarea" placeholder="③規範"></textarea>
-<textarea id="precedentCommentaryInput" class="editBodyArea precedentTextarea" placeholder="④解説（自分の言葉で要約）"></textarea>
-<textarea id="precedentCompactInput" class="editBodyArea precedentTextarea" placeholder="⑤見直し版（試験直前に30秒で読める3〜5行）"></textarea>
-<textarea id="precedentConclusionInput" class="editBodyArea precedentTextarea" placeholder="結論（任意）"></textarea>
-<textarea id="precedentFeatureInput" class="editBodyArea precedentTextarea" placeholder="特徴・百選的理由（任意）"></textarea>
-<textarea id="precedentExamMentionsInput" class="editBodyArea precedentTextarea" placeholder="出題趣旨・採点実感での言及（年度別、任意）"></textarea>
+<label class="precedentField"><span class="precedentFieldLabel">①事実（事案の概要）</span><textarea id="precedentSummaryInput" class="editBodyArea precedentTextarea" placeholder="①事実（事案の概要）"></textarea></label>
+<label class="precedentField"><span class="precedentFieldLabel">②判旨</span><textarea id="precedentHoldingInput" class="editBodyArea precedentTextarea" placeholder="②判旨"></textarea></label>
+<label class="precedentField"><span class="precedentFieldLabel">③規範</span><textarea id="precedentNormInput" class="editBodyArea precedentTextarea" placeholder="③規範"></textarea></label>
+<label class="precedentField"><span class="precedentFieldLabel">④解説</span><textarea id="precedentCommentaryInput" class="editBodyArea precedentTextarea" placeholder="④解説"></textarea></label>
+<label class="precedentField"><span class="precedentFieldLabel">⑤見直し版</span><textarea id="precedentCompactInput" class="editBodyArea precedentTextarea" placeholder="⑤見直し版（試験直前に30秒で読める3〜5行）"></textarea></label>
+<label class="precedentField"><span class="precedentFieldLabel">結論（任意）</span><textarea id="precedentConclusionInput" class="editBodyArea precedentTextarea" placeholder="結論（任意）"></textarea></label>
+<label class="precedentField"><span class="precedentFieldLabel">特徴・百選的理由（任意）</span><textarea id="precedentFeatureInput" class="editBodyArea precedentTextarea" placeholder="特徴・百選的理由（任意）"></textarea></label>
+<label class="precedentField"><span class="precedentFieldLabel">出題趣旨・採点実感での言及（任意）</span><textarea id="precedentExamMentionsInput" class="editBodyArea precedentTextarea" placeholder="出題趣旨・採点実感での言及（年度別、任意）"></textarea></label>
+<div class="past-log-small-note precedentFormBodyNote" style="flex:1 1 100%;margin-top:0;">①事実・②判旨・③規範・④解説・結論の欄に貼り付けると、紙面の行の終わりで入った改行は自動でつながります（「。」で終わる短い行＝段落の終わりや、「・」「Ⅰ」などで始まる行の前の改行は残ります）。</div>
 </div>
 <div class="past-log-header" id="precedentFormActions">
 <button id="precedentSaveBtn">保存する</button>
