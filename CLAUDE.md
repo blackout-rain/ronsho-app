@@ -53,7 +53,7 @@
 
 ### 実装の要点（`drive-sync.js`）
 
-- `buildAuthRedirectUrl()` / `authRedirectUri()`：Googleのログイン画面へのURLを組み立てる。**`authRedirectUri()`は固定文字列`'https://blackout0802.github.io/ronsho-app/'`を返す**（`window.location`から動的に組み立てない）。理由：`manifest.json`の`start_url`が`./index.html`のため、ホーム画面に追加したPWAから開くと`window.location.pathname`が`/ronsho-app/index.html`になり、通常ブラウザの`/ronsho-app/`と食い違って`redirect_uri_mismatch`エラーになるため。
+- `buildAuthRedirectUrl()` / `authRedirectUri()`：Googleのログイン画面へのURLを組み立てる。**`authRedirectUri()`は固定文字列`'https://blackout-rain.github.io/ronsho-app/'`を返す**（`window.location`から動的に組み立てない）。理由：`manifest.json`の`start_url`が`./index.html`のため、ホーム画面に追加したPWAから開くと`window.location.pathname`が`/ronsho-app/index.html`になり、通常ブラウザの`/ronsho-app/`と食い違って`redirect_uri_mismatch`エラーになるため。
 - `URLSearchParams`は使わない（Safari実機で`The string did not match the expected pattern.`という互換性エラーが発生したため）。クエリ文字列の組み立て・分解は手書きの文字列処理で行う。
 - `consumeAuthRedirectCode()`：ページ読み込み時、URLの`?code=...`を読み取る。**読み取りより先にURLから消す**（`history.replaceState`）。解析に失敗しても認可コードがURLに残り続けて開くたびに同じ処理を繰り返さないため。
 - 認可コードはクライアントからGAS側に送り、**GAS側でのみ**Googleのトークンエンドポイントに対しクライアントシークレットを使ってアクセストークンに交換する（`handleCodeExchange`、GAS側）。クライアントシークレットは絶対にリポジトリに含めない（後述）。
@@ -81,11 +81,11 @@
 - GAS側で、Apps Scriptエディタの ⚙️「プロジェクトの設定」→「スクリプト プロパティ」に、プロパティ名`CLIENT_SECRET`として保存されている。`handleCodeExchange()`がここから読み出す。
 - `AUTH_CLIENT_ID`（OAuthクライアントID）は非公開情報ではないため、`drive-sync.js`・`tools/gas-backup/code.gs`の両方にハードコードしてよい。両者は必ず同じ値にすること。
 
-## Google Cloud Console側の設定（既に完了済み・通常は変更不要）
+## Google Cloud Console側の設定
 
-OAuthクライアント（`1008108195377-3i95ujevlk1keuf02tcitnuikniie9al.apps.googleusercontent.com`）に、以下が登録済み：
-- 承認済みのJavaScript生成元：`https://blackout0802.github.io`
-- 承認済みのリダイレクトURI：`https://blackout0802.github.io/ronsho-app/`
+OAuthクライアント（`1008108195377-3i95ujevlk1keuf02tcitnuikniie9al.apps.googleusercontent.com`）に、以下を登録する（2026-10-24にリポジトリをblackout0802からblackout-rainへ移管し、公開URLが`https://blackout-rain.github.io/ronsho-app/`に変わった。旧URL`https://blackout0802.github.io/ronsho-app/`は404になる）：
+- 承認済みのJavaScript生成元：`https://blackout-rain.github.io`
+- 承認済みのリダイレクトURI：`https://blackout-rain.github.io/ronsho-app/`
 
 アプリのURL自体を変更しない限り、これらの再設定は不要。
 
