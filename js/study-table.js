@@ -156,10 +156,21 @@ function renderReviewQueue() {
   });
 }
 // ▲▲▲ 復習キュー ここまで ▲▲▲
+// CSV出力で暗記済みの論証を除くかどうか（'1'=除く／'0'=含める。未設定は従来どおり除く）
+const CSV_EXCLUDE_MEMORIZED_KEY = 'ronshoCsvExcludeMemorizedV1';
+function loadCsvExcludeMemorized() {
+  return localStorage.getItem(CSV_EXCLUDE_MEMORIZED_KEY) !== '0';
+}
+function saveCsvExcludeMemorized(v) {
+  localStorage.setItem(CSV_EXCLUDE_MEMORIZED_KEY, v ? '1' : '0');
+  if (typeof window.ronshoSyncNotifyChange === 'function') window.ronshoSyncNotifyChange();
+}
 function getCsvFilteredEntries() {
-  const unmemorized = entries.filter(e => !(studyLog[e.title] && studyLog[e.title].memorized));
-  if (selectedCsvSubject === 'all') return unmemorized;
-  return unmemorized.filter(e => (e.subject || 'その他') === selectedCsvSubject);
+  const base = loadCsvExcludeMemorized()
+    ? entries.filter(e => !(studyLog[e.title] && studyLog[e.title].memorized))
+    : entries;
+  if (selectedCsvSubject === 'all') return base;
+  return base.filter(e => (e.subject || 'その他') === selectedCsvSubject);
 }
 function renderCsvSubjectFilter() {
   if (!csvSubjectFilter) return;
@@ -169,7 +180,18 @@ function renderCsvSubjectFilter() {
     html += '<option value="' + escapeHtml(s) + '"' + (selectedCsvSubject === s ? ' selected' : '') + '>' + getSubjectEmoji(s) + ' ' + escapeHtml(s) + '</option>';
   });
   csvSubjectFilter.innerHTML = html;
+  const excludeChk = document.getElementById('csvExcludeMemorizedChk');
+  if (excludeChk) excludeChk.checked = loadCsvExcludeMemorized();
 }
+(() => {
+  const excludeChk = document.getElementById('csvExcludeMemorizedChk');
+  if (!excludeChk) return;
+  excludeChk.checked = loadCsvExcludeMemorized();
+  excludeChk.addEventListener('change', () => {
+    saveCsvExcludeMemorized(excludeChk.checked);
+    renderCsvTable(getCsvFilteredEntries());
+  });
+})();
 function renderCsvTable(data) {
   let html = '<table><colgroup><col style="width:14%;"><col style="width:26%;"><col style="width:46%;"><col style="width:14%;"></colgroup><thead><tr><th>Subject（科目）</th><th>FrontText（タイトル）</th><th>BackText（本文）</th><th>Comment（出題年）</th></tr></thead><tbody>';
   data.forEach(e => {
@@ -1248,7 +1270,7 @@ downloadBtn.addEventListener('click', () => {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   const subjectLabel = selectedCsvSubject === 'all' ? '全科目' : selectedCsvSubject;
-  status.textContent = subjectLabel + '（暗記済み除外）で' + filtered.length + '件をCSV出力しました。';
+  status.textContent = subjectLabel + '（' + (loadCsvExcludeMemorized() ? '暗記済み除外' : '暗記済みを含む') + '）で' + filtered.length + '件をCSV出力しました。';
 });
 downloadLogBtn.addEventListener('click', () => {
   const header = ['科目', '分野', 'タイトル', '学習回数', '最終学習日', '次回推奨復習日', '暗記度', '苦手フラグ'];

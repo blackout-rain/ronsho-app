@@ -182,6 +182,7 @@ function restoreFromBackupPayload(data) {
     speechDefaultImportance: 'ronshoSpeechDefaultImportanceV1',
     speechDefaultLoop: 'ronshoSpeechDefaultLoopV1',
     speechDefaultIncludeMemorized: 'ronshoSpeechDefaultIncludeMemorizedV1',
+    csvExcludeMemorized: 'ronshoCsvExcludeMemorizedV1',
     starFilterDefault: 'ronshoStarFilterDefaultV1',
     pastExamDefaultType: 'ronshoPastExamDefaultTypeV1',
     backupReminderDays: 'ronshoBackupReminderDaysV1',

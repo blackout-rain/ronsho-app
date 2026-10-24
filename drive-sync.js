@@ -50,6 +50,7 @@
   const SPEECH_DEFAULT_IMPORTANCE_KEY = 'ronshoSpeechDefaultImportanceV1';
   const SPEECH_DEFAULT_LOOP_KEY = 'ronshoSpeechDefaultLoopV1';
   const SPEECH_DEFAULT_INCLUDE_MEMORIZED_KEY = 'ronshoSpeechDefaultIncludeMemorizedV1';
+  const CSV_EXCLUDE_MEMORIZED_KEY = 'ronshoCsvExcludeMemorizedV1';
   const STAR_FILTER_DEFAULT_KEY = 'ronshoStarFilterDefaultV1';
   const TAB_SHORTCUTS_KEY = 'ronshoTabShortcutsV1';
   const PAST_EXAM_DEFAULT_TYPE_KEY = 'ronshoPastExamDefaultTypeV1';
@@ -84,6 +85,7 @@
     speechDefaultImportance: '🔊 読み上げの重要度設定',
     speechDefaultLoop: '🔊 読み上げのループ設定',
     speechDefaultIncludeMemorized: '🔊 読み上げの暗記済み設定',
+    csvExcludeMemorized: '📤 CSV出力の暗記済み設定',
     starFilterDefault: '😰 苦手フィルタの既定',
     tabShortcuts: '⌨️ ショートカット設定',
     pastExamDefaultType: '📄 過去問ログの既定種別',
@@ -172,6 +174,7 @@
     speechDefaultImportance: readRaw(SPEECH_DEFAULT_IMPORTANCE_KEY, ''),
     speechDefaultLoop: readRaw(SPEECH_DEFAULT_LOOP_KEY, ''),
     speechDefaultIncludeMemorized: readRaw(SPEECH_DEFAULT_INCLUDE_MEMORIZED_KEY, ''),
+    csvExcludeMemorized: readRaw(CSV_EXCLUDE_MEMORIZED_KEY, ''),
     starFilterDefault: readRaw(STAR_FILTER_DEFAULT_KEY, ''),
     tabShortcuts: read(TAB_SHORTCUTS_KEY, {}),
     pastExamDefaultType: readRaw(PAST_EXAM_DEFAULT_TYPE_KEY, ''),
@@ -249,6 +252,7 @@
       writeRaw(SPEECH_DEFAULT_IMPORTANCE_KEY, data.speechDefaultImportance);
       writeRaw(SPEECH_DEFAULT_LOOP_KEY, data.speechDefaultLoop);
       writeRaw(SPEECH_DEFAULT_INCLUDE_MEMORIZED_KEY, data.speechDefaultIncludeMemorized);
+      writeRaw(CSV_EXCLUDE_MEMORIZED_KEY, data.csvExcludeMemorized);
       writeRaw(STAR_FILTER_DEFAULT_KEY, data.starFilterDefault);
       write(TAB_SHORTCUTS_KEY, data.tabShortcuts || {});
       writeRaw(PAST_EXAM_DEFAULT_TYPE_KEY, data.pastExamDefaultType);
