@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>論証集アプリ v30.0（判例を詳細版・簡易版のタブに分け、太字・色付けに対応）</title>
+<title>論証集アプリ v30.1（判例の編集画面を閲覧画面と同じ幅にし、プレビューを追加）</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0057e7">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@ try {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script><link rel="stylesheet" href="style.css">
 </head>
 <body>
-<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v30.0</span></h1>
+<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v30.1</span></h1>
 <div id="status"></div>
 <div id="syncConflictBanner" class="syncConflictBanner"></div>
 <div id="backupReminderBanner" class="backupReminderBanner"></div>
@@ -274,9 +274,11 @@ try {
 <div class="precedentField"><span class="precedentFieldLabel">見直し版</span><div id="precedentCompactInput" class="editBodyArea precedentRich" contenteditable="true" data-placeholder="見直し版（試験直前に30秒で読める3〜5行）"></div></div>
 </div>
 <div class="past-log-header" id="precedentFormActions">
-<button id="precedentSaveBtn">保存する</button>
-<span class="clearEntriesLink" id="precedentCancelEditBtn" style="display:none;">編集をやめる</span>
+<button type="button" id="precedentSaveBtn">保存する</button>
+<button type="button" id="precedentPreviewBtn">👁 プレビュー</button>
+<button type="button" id="precedentCancelEditBtn">キャンセル</button>
 </div>
+<div id="precedentPreviewArea"></div>
 <div id="precedentProgress" class="quizProgress"></div>
 <div id="precedentArea"></div>
 </div>

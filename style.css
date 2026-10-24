@@ -1692,6 +1692,11 @@ table.pastMatrixTable th, table.pastMatrixTable td {
 .precedentFormSectionTitle { flex: 1 1 100%; font-size: 13px; font-weight: bold; color: var(--text-primary, inherit); border-bottom: 1px solid var(--border-strong); padding-bottom: 3px; margin-top: 4px; }
 .precedentViewTabs { display: flex; gap: 6px; justify-content: center; margin: 8px 0; }
 .precedentViewTab { font-size: 13px; padding: 5px 14px; border: 1px solid var(--border-strong); border-radius: 999px; cursor: pointer; background: var(--card-bg); }
+/* 編集画面を閲覧画面のカードと同じ幅にそろえる */
+#precedentPasteBlock, #precedentForm, #precedentFormBody, #precedentFormActions, #precedentPreviewArea { max-width: 720px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
+#precedentPreviewArea:empty { display: none; }
+#precedentPreviewArea { margin-bottom: 16px; }
+.precedentPreviewLabel { font-size: 12px; font-weight: bold; color: var(--text-secondary2); margin-bottom: 6px; }
 .precedentViewTab.active { background: #0057e7; color: #fff; border-color: #0057e7; font-weight: bold; }
 /* ▲▲▲ 判例一覧タブ ここまで ▲▲▲ */
 /* ▲▲▲ 過去問ログ一覧マトリクス ここまで ▲▲▲ */

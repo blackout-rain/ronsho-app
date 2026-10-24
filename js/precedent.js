@@ -577,20 +577,12 @@ function resetPrecedentForm() {
   const pasteInputEl = document.getElementById('precedentPasteInput');
   if (pasteInputEl) pasteInputEl.value = '';
   document.getElementById('precedentSaveBtn').textContent = '保存する';
-  document.getElementById('precedentCancelEditBtn').style.display = 'none';
+  document.getElementById('precedentCancelEditBtn').textContent = 'キャンセル';
 }
 
 function openPrecedentFormForEdit(p) {
   const form = document.getElementById('precedentForm');
-  const addToggleBtn = document.getElementById('precedentAddToggleBtn');
-  const pasteBlock = document.getElementById('precedentPasteBlock');
-  if (form && !form.classList.contains('pastLogFormOpen')) {
-    if (pasteBlock) pasteBlock.classList.add('pastLogFormOpen');
-    form.classList.add('pastLogFormOpen');
-    document.getElementById('precedentFormBody').classList.add('pastLogFormOpen');
-    document.getElementById('precedentFormActions').classList.add('pastLogFormOpen');
-    if (addToggleBtn) addToggleBtn.textContent = '－ 閉じる';
-  }
+  setPrecedentFormOpen(true);
   precedentEditingId = p.id;
   document.getElementById('precedentNameInput').value = p.name || '';
   document.getElementById('precedentDateInput').value = p.date || '';
@@ -599,8 +591,83 @@ function openPrecedentFormForEdit(p) {
   PRECEDENT_BODY_FIELDS.forEach(f => setPrecedentRichValue(f.id, p[f.key], p[f.key + 'Html']));
   renderPrecedentRichToolbar();
   document.getElementById('precedentSaveBtn').textContent = '更新する';
-  document.getElementById('precedentCancelEditBtn').style.display = 'inline-block';
+  document.getElementById('precedentCancelEditBtn').textContent = '編集をやめる';
   form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// カードの科目・判決日・百選・タイトル部分（閲覧画面とプレビューで共通）
+function buildPrecedentHeaderHtml(p) {
+  return '<div class="quizMeta">' + escapeHtml(p.subject || '未設定') + (p.date && p.name ? ' ｜ ' + escapeHtml(p.date) : '') + (p.hyakusen ? ' ｜ 百選 ' + escapeHtml(p.hyakusen) : '') + '</div>'
+    + '<div class="quizTitle">' + escapeHtml(precedentDisplayTitle(p)) + '</div>';
+}
+// 簡易版／詳細版のタブと本文（閲覧画面とプレビューで共通）
+function buildPrecedentViewBodyHtml(p) {
+  let html = '';
+  const hasSimple = PRECEDENT_BODY_FIELDS.some(f => f.section === 'simple' && p[f.key]);
+  html += '<div class="precedentViewTabs">'
+    + '<span class="precedentViewTab' + (precedentViewMode === 'simple' ? ' active' : '') + '" data-mode="simple">📝 簡易版</span>'
+    + '<span class="precedentViewTab' + (precedentViewMode === 'detail' ? ' active' : '') + '" data-mode="detail">📖 詳細版</span>'
+    + '</div>';
+  if (precedentViewMode === 'simple' && !hasSimple) {
+    html += '<div class="quizEmpty">簡易版はまだありません。✏️で編集画面を開き、「詳細版から簡易版を作る指示文をコピー」から作れます。</div>';
+    return html;
+  }
+  // 見直し版は試験直前に流し読みする用のため、簡易版の一番上に出す
+  const order = precedentViewMode === 'simple'
+    ? ['compact', 'simpleFacts', 'simpleHolding', 'norm', 'simpleCommentary']
+    : ['summary', 'holding', 'commentary', 'conclusion', 'feature', 'examMentions'];
+  order.forEach(key => {
+    const f = PRECEDENT_BODY_FIELDS.find(x => x.key === key);
+    // 事実・判旨は詳細版の基本項目なので未入力でも枠を出し、それ以外は入力済みのときだけ表示する
+    if (!p[key] && !(key === 'summary' || key === 'holding')) return;
+    html += '<div class="quizBody"><strong>【' + f.label + '】</strong><br>' + (p[key] ? precedentFieldHtml(p, key) : '（未入力）') + '</div>';
+  });
+  return html;
+}
+// 編集フォームの入力内容を、保存するときと同じ形の判例データにまとめる
+function collectPrecedentFormValues() {
+  const values = {
+    name: document.getElementById('precedentNameInput').value.trim(),
+    date: document.getElementById('precedentDateInput').value.trim(),
+    subject: document.getElementById('precedentSubjectInput').value.trim(),
+    hyakusen: document.getElementById('precedentHyakusenInput').value.trim()
+  };
+  const allowedColors = new Set(getPrecedentAllowedColors());
+  PRECEDENT_BODY_FIELDS.forEach(f => {
+    const v = getPrecedentRichValue(f.id, allowedColors);
+    values[f.key] = v.text;
+    // 装飾が無くなった欄は古いHTMLが残らないよう、いったん空で上書きする（保存時に削除）
+    values[f.key + 'Html'] = v.html;
+  });
+  return values;
+}
+// 更新前に、閲覧画面でどう表示されるかを確認する
+function renderPrecedentPreview() {
+  const area = document.getElementById('precedentPreviewArea');
+  if (!area) return;
+  const p = collectPrecedentFormValues();
+  area.innerHTML = '<div class="precedentPreviewLabel">👁 プレビュー（まだ保存されていません）</div>'
+    + '<div class="quizCard">' + buildPrecedentHeaderHtml(p) + buildPrecedentViewBodyHtml(p) + '</div>';
+  area.querySelectorAll('.precedentViewTab').forEach(tab => tab.addEventListener('click', () => {
+    precedentViewMode = tab.dataset.mode;
+    renderPrecedentPreview();
+  }));
+}
+// 編集フォームの開閉。編集中は下の閲覧画面を隠し、見ている内容が混ざらないようにする
+function setPrecedentFormOpen(open) {
+  ['precedentPasteBlock', 'precedentForm', 'precedentFormBody', 'precedentFormActions'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('pastLogFormOpen', open);
+  });
+  ['precedentProgress', 'precedentArea'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = open ? 'none' : '';
+  });
+  const preview = document.getElementById('precedentPreviewArea');
+  if (preview) preview.innerHTML = '';
+  const addToggleBtn = document.getElementById('precedentAddToggleBtn');
+  if (addToggleBtn) addToggleBtn.textContent = open ? '－ 閉じる' : '＋ 判例を追加';
+  if (open) renderPrecedentRichToolbar();
 }
 
 function renderPrecedentPage() {
@@ -633,30 +700,11 @@ function renderPrecedentPage() {
     + '<button type="button" class="quizNavBtn" id="precedentPrevBtn"' + (precedentIndex === 0 ? ' disabled' : '') + '>◀ 前の判例</button>'
     + '<button type="button" class="quizNavBtn" id="precedentNextBtn"' + (precedentIndex >= list.length - 1 ? ' disabled' : '') + '>次の判例 ▶</button>'
     + '</div>';
-  html += '<div class="quizMeta">' + escapeHtml(p.subject || '未設定') + (p.date && p.name ? ' ｜ ' + escapeHtml(p.date) : '') + (p.hyakusen ? ' ｜ 百選 ' + escapeHtml(p.hyakusen) : '') + '</div>';
-  html += '<div class="quizTitle">' + escapeHtml(precedentDisplayTitle(p)) + '</div>';
+  html += buildPrecedentHeaderHtml(p);
   if (!precedentRevealed) {
     html += '<div class="quizShowBtn" id="precedentShowBtn">📖 内容を表示</div>';
   } else {
-    const hasSimple = PRECEDENT_BODY_FIELDS.some(f => f.section === 'simple' && p[f.key]);
-    html += '<div class="precedentViewTabs">'
-      + '<span class="precedentViewTab' + (precedentViewMode === 'simple' ? ' active' : '') + '" data-mode="simple">📝 簡易版</span>'
-      + '<span class="precedentViewTab' + (precedentViewMode === 'detail' ? ' active' : '') + '" data-mode="detail">📖 詳細版</span>'
-      + '</div>';
-    if (precedentViewMode === 'simple' && !hasSimple) {
-      html += '<div class="quizEmpty">簡易版はまだありません。✏️で編集画面を開き、「詳細版から簡易版を作る指示文をコピー」から作れます。</div>';
-    } else {
-      // 見直し版は試験直前に流し読みする用のため、簡易版の一番上に出す
-      const order = precedentViewMode === 'simple'
-        ? ['compact', 'simpleFacts', 'simpleHolding', 'norm', 'simpleCommentary']
-        : ['summary', 'holding', 'commentary', 'conclusion', 'feature', 'examMentions'];
-      order.forEach(key => {
-        const f = PRECEDENT_BODY_FIELDS.find(x => x.key === key);
-        // 事実・判旨は詳細版の基本項目なので未入力でも枠を出し、それ以外は入力済みのときだけ表示する
-        if (!p[key] && !(key === 'summary' || key === 'holding')) return;
-        html += '<div class="quizBody"><strong>【' + f.label + '】</strong><br>' + (p[key] ? precedentFieldHtml(p, key) : '（未入力）') + '</div>';
-      });
-    }
+    html += buildPrecedentViewBodyHtml(p);
   }
   html += '</div>';
   area.innerHTML = html;
@@ -697,37 +745,20 @@ function renderPrecedentPage() {
 function initPrecedentFeature() {
   const addToggleBtn = document.getElementById('precedentAddToggleBtn');
   const form = document.getElementById('precedentForm');
-  const formBody = document.getElementById('precedentFormBody');
-  const formActions = document.getElementById('precedentFormActions');
-  const pasteBlock = document.getElementById('precedentPasteBlock');
   const saveBtn = document.getElementById('precedentSaveBtn');
   const cancelEditBtn = document.getElementById('precedentCancelEditBtn');
   const subjectFilterSel = document.getElementById('precedentSubjectFilter');
   if (!addToggleBtn || !form || !saveBtn) return;
 
   addToggleBtn.addEventListener('click', () => {
-    const open = form.classList.toggle('pastLogFormOpen');
-    if (pasteBlock) pasteBlock.classList.toggle('pastLogFormOpen', open);
-    formBody.classList.toggle('pastLogFormOpen', open);
-    formActions.classList.toggle('pastLogFormOpen', open);
-    addToggleBtn.textContent = open ? '－ 閉じる' : '＋ 判例を追加';
-    if (open) renderPrecedentRichToolbar();
+    const open = !form.classList.contains('pastLogFormOpen');
+    setPrecedentFormOpen(open);
     if (!open) resetPrecedentForm();
   });
 
   saveBtn.addEventListener('click', () => {
-    const name = document.getElementById('precedentNameInput').value.trim();
-    const date = document.getElementById('precedentDateInput').value.trim();
-    const subject = document.getElementById('precedentSubjectInput').value.trim();
-    const hyakusen = document.getElementById('precedentHyakusenInput').value.trim();
-    const allowedColors = new Set(getPrecedentAllowedColors());
-    const bodyValues = {};
-    PRECEDENT_BODY_FIELDS.forEach(f => {
-      const v = getPrecedentRichValue(f.id, allowedColors);
-      bodyValues[f.key] = v.text;
-      // 装飾が無くなった欄は古いHTMLが残らないよう、いったん空で上書きする（保存時に削除）
-      bodyValues[f.key + 'Html'] = v.html;
-    });
+    const values = collectPrecedentFormValues();
+    const { name, date } = values;
     if (!date && !name) {
       alert('判例名か判決日のどちらかは入力してください。');
       return;
@@ -735,7 +766,7 @@ function initPrecedentFeature() {
     if (precedentEditingId) {
       const idx = precedents.findIndex(p => p.id === precedentEditingId);
       if (idx !== -1) {
-        precedents[idx] = { ...precedents[idx], name, date, subject, hyakusen, ...bodyValues };
+        precedents[idx] = { ...precedents[idx], ...values };
         // 装飾を外した欄の空のHTMLは残さない
         PRECEDENT_BODY_FIELDS.forEach(f => { if (!precedents[idx][f.key + 'Html']) delete precedents[idx][f.key + 'Html']; });
       }
@@ -743,7 +774,7 @@ function initPrecedentFeature() {
     } else {
       precedents.push({
         id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
-        name, date, subject, hyakusen, ...bodyValues,
+        ...values,
         createdAt: new Date().toISOString()
       });
       const added = precedents[precedents.length - 1];
@@ -752,17 +783,21 @@ function initPrecedentFeature() {
     }
     savePrecedents();
     resetPrecedentForm();
-    form.classList.remove('pastLogFormOpen');
-    if (pasteBlock) pasteBlock.classList.remove('pastLogFormOpen');
-    formBody.classList.remove('pastLogFormOpen');
-    formActions.classList.remove('pastLogFormOpen');
-    addToggleBtn.textContent = '＋ 判例を追加';
+    setPrecedentFormOpen(false);
     precedentRevealed = false;
     renderPrecedentPage();
   });
 
   cancelEditBtn.addEventListener('click', () => {
     resetPrecedentForm();
+    setPrecedentFormOpen(false);
+    renderPrecedentPage();
+  });
+  const previewBtn = document.getElementById('precedentPreviewBtn');
+  if (previewBtn) previewBtn.addEventListener('click', () => {
+    renderPrecedentPreview();
+    const preview = document.getElementById('precedentPreviewArea');
+    if (preview) preview.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
   if (subjectFilterSel) subjectFilterSel.addEventListener('change', () => {
