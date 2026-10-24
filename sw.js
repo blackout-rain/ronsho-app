@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ronsho-app-cache-v218';
+const CACHE_NAME = 'ronsho-app-cache-v219';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -54,8 +54,13 @@ self.addEventListener('fetch', (event) => {
   const url = req.url;
   if (isSyncOrAuthRequest(url)) return;
 
+  // GitHub Pagesは静的ファイルに10分間のブラウザキャッシュを付けるため、
+  // そのまま取得すると新バージョンのindex.htmlと古いjsが混ざることがある。
+  // 同じサイト内のファイルは毎回サーバーに更新有無を確認（変更なしなら304で軽い）する
+  const sameOrigin = new URL(url).origin === self.location.origin;
+  const networkFetch = sameOrigin ? fetch(url, { cache: 'no-cache', credentials: 'same-origin' }) : fetch(req);
   event.respondWith(
-    fetch(req)
+    networkFetch
       .then((res) => {
         if (res && res.ok) {
           const clone = res.clone();
