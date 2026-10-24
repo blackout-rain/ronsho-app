@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>論証集アプリ v29.7（blackout-rainの新URLでログイン・同期できるよう対応）</title>
+<title>論証集アプリ v29.8（判例を事実・判旨・規範・解説・見直し版の5項目で保存できるよう対応）</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0057e7">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@ try {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script><link rel="stylesheet" href="style.css">
 </head>
 <body>
-<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v29.7</span></h1>
+<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v29.8</span></h1>
 <div id="status"></div>
 <div id="syncConflictBanner" class="syncConflictBanner"></div>
 <div id="backupReminderBanner" class="backupReminderBanner"></div>
@@ -238,19 +238,32 @@ try {
 <button type="button" id="precedentAddToggleBtn" class="pastAddToggleBtn">＋ 判例を追加</button>
 </div>
 <div class="past-log-header" id="precedentPasteBlock">
-<textarea id="precedentPasteInput" class="editBodyArea precedentTextarea" placeholder="ChatGPTやGoogleのAI概要などで作った判例の要約を、ここに貼り付けてください。&#10;例：&#10;泉佐野市民会館事件（最判平成7年3月7日）&#10;&#10;* 事案: ……&#10;* 判旨: ……&#10;* 結論: ……&#10;* 特徴（百選的理由）: ……"></textarea>
+<textarea id="precedentPasteInput" class="editBodyArea precedentTextarea" placeholder="ClaudeやChatGPTなどで作った判例の要約を、ここに貼り付けてください。&#10;例：&#10;泉佐野市民会館事件（最判平成7年3月7日）&#10;科目：憲法&#10;百選：憲法Ⅰ（第8版）81事件&#10;①事実：……&#10;②判旨：……&#10;③規範：……&#10;④解説：……&#10;⑤見直し版：……"></textarea>
 <button type="button" id="precedentPasteParseBtn">📋 貼り付けた内容から自動入力</button>
-<div class="past-log-small-note">「判例名（判決日）」の見出し行、または「【6-1】基本情報」のような番号付き見出し形式のどちらにも対応しています。「事案」「判旨」「結論」「規範」「特徴（百選的理由）」「出題趣旨・採点実感での言及」などの見出し・箇条書きから、下のフォームへ自動で振り分けます。科目は「科目:」ラベルがあればそれを使い、無ければ本文中の科目名（憲法・民法など）から推測します。振り分け後は必ず内容を確認・修正してから保存してください。</div>
+<button type="button" id="precedentPromptCopyBtn">📷 写真から作る用の指示文をコピー</button>
+<details class="past-log-small-note"><summary>写真から5項目を作る手順</summary>
+<ol>
+<li>上の「指示文をコピー」を押し、Claudeアプリ（プロジェクトの指示に保存しておくと毎回貼らずに済みます）に貼り付けます。</li>
+<li>購入した判例百選のページを撮影して送ると、①事実〜⑤見直し版の形式で返ってきます。</li>
+<li>返ってきた文章をそのままここに貼り付けて「自動入力」を押し、内容を確認してから保存します。</li>
+<li>Open Codeなどで複数件をまとめて作った場合は、判例ごとに「=====」の行で区切って貼り付けると、まとめて登録できます。</li>
+</ol>
+写真そのものはこのアプリには保存されません。</details>
+<div class="past-log-small-note">「判例名（判決日）」の見出し行、または「【6-1】基本情報」のような番号付き見出し形式のどちらにも対応しています。「事実（事案）」「判旨」「規範」「解説」「見直し版」「百選」「結論」「特徴（百選的理由）」「出題趣旨・採点実感での言及」などの見出し・箇条書きから、下のフォームへ自動で振り分けます。科目は「科目:」ラベルがあればそれを使い、無ければ本文中の科目名（憲法・民法など）から推測します。振り分け後は必ず内容を確認・修正してから保存してください。</div>
 </div>
 <div class="past-log-header" id="precedentForm">
 <input type="text" id="precedentNameInput" placeholder="判例名（任意）例：三菱樹脂事件" style="width:220px;">
 <input type="text" id="precedentDateInput" placeholder="判決日 例：最大判昭和48年12月12日" style="width:240px;">
 <span>科目：</span>
 <input type="text" id="precedentSubjectInput" placeholder="例：憲法" style="width:110px;" list="subjectSuggestions">
+<input type="text" id="precedentHyakusenInput" placeholder="百選 例：憲法Ⅰ（第8版）81事件（任意）" style="width:260px;">
 </div>
 <div class="past-log-header precedentFormBody" id="precedentFormBody">
-<textarea id="precedentSummaryInput" class="editBodyArea precedentTextarea" placeholder="事案の概要"></textarea>
-<textarea id="precedentHoldingInput" class="editBodyArea precedentTextarea" placeholder="判旨"></textarea>
+<textarea id="precedentSummaryInput" class="editBodyArea precedentTextarea" placeholder="①事実（事案の概要）"></textarea>
+<textarea id="precedentHoldingInput" class="editBodyArea precedentTextarea" placeholder="②判旨"></textarea>
+<textarea id="precedentNormInput" class="editBodyArea precedentTextarea" placeholder="③規範"></textarea>
+<textarea id="precedentCommentaryInput" class="editBodyArea precedentTextarea" placeholder="④解説（自分の言葉で要約）"></textarea>
+<textarea id="precedentCompactInput" class="editBodyArea precedentTextarea" placeholder="⑤見直し版（試験直前に30秒で読める3〜5行）"></textarea>
 <textarea id="precedentConclusionInput" class="editBodyArea precedentTextarea" placeholder="結論（任意）"></textarea>
 <textarea id="precedentFeatureInput" class="editBodyArea precedentTextarea" placeholder="特徴・百選的理由（任意）"></textarea>
 <textarea id="precedentExamMentionsInput" class="editBodyArea precedentTextarea" placeholder="出題趣旨・採点実感での言及（年度別、任意）"></textarea>

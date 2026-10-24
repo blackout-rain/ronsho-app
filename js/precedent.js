@@ -44,7 +44,7 @@ function precedentFilteredList() {
   // 全文検索（判例名・判決日・科目・各本文欄が対象）
   const q = (precedentSearchQuery || '').trim().toLowerCase();
   if (q) {
-    list = list.filter(p => [p.name, p.date, p.subject, p.summary, p.holding, p.conclusion, p.feature, p.examMentions]
+    list = list.filter(p => [p.name, p.date, p.subject, p.hyakusen, p.summary, p.holding, p.norm, p.commentary, p.compact, p.conclusion, p.feature, p.examMentions]
       .some(v => (v || '').toLowerCase().includes(q)));
   }
   return list;
@@ -72,13 +72,17 @@ function renderPrecedentSubjectFilter() {
    持たず、既存の入力欄に値を流し込むだけなので、保存前に必ず内容を確認・
    修正できる（自動保存はしない） */
 const PRECEDENT_PASTE_BASIC_LABELS = ['基本情報'];
-const PRECEDENT_PASTE_SUMMARY_LABELS = ['事案の概要', '事案'];
+const PRECEDENT_PASTE_SUMMARY_LABELS = ['事案の概要', '事案', '事実'];
 const PRECEDENT_PASTE_HOLDING_LABELS = ['判旨', '判決要旨', '要旨'];
 const PRECEDENT_PASTE_NORM_LABELS = ['規範', '法理'];
 const PRECEDENT_PASTE_CONCLUSION_LABELS = ['結論'];
 const PRECEDENT_PASTE_FEATURE_LABELS = ['特徴', '百選的理由', 'ポイント'];
 const PRECEDENT_PASTE_SUBJECT_LABELS = ['科目', '分野'];
 const PRECEDENT_PASTE_EXAM_MENTION_LABELS = ['採点実感', '出題趣旨'];
+// 写真から5項目（①事実〜⑤見直し版）を作る形式で追加した見出し
+const PRECEDENT_PASTE_COMMENTARY_LABELS = ['解説'];
+const PRECEDENT_PASTE_COMPACT_LABELS = ['見直し', 'コンパクト', '要点まとめ'];
+const PRECEDENT_PASTE_HYAKUSEN_LABELS = ['百選'];
 // 「科目:」のようなラベルが本文中に無いことが多いため、その場合は既存の
 // 論証一覧・カレンダー等でも使っている科目名（js/core.jsのSUBJECT_EMOJIの
 // キー）が本文中のどこかに出てきていないかを探し、最も早く出てきたものを
@@ -103,11 +107,16 @@ function precedentPasteLabelToField(label) {
   if (PRECEDENT_PASTE_BASIC_LABELS.some(k => label.includes(k))) return { field: 'basic', prefix: '' };
   if (PRECEDENT_PASTE_SUMMARY_LABELS.some(k => label.includes(k))) return { field: 'summary', prefix: '' };
   if (PRECEDENT_PASTE_HOLDING_LABELS.some(k => label.includes(k))) return { field: 'holding', prefix: '' };
-  if (PRECEDENT_PASTE_NORM_LABELS.some(k => label.includes(k))) return { field: 'holding', prefix: '【規範】' };
+  if (PRECEDENT_PASTE_NORM_LABELS.some(k => label.includes(k))) return { field: 'norm', prefix: '' };
+  if (PRECEDENT_PASTE_COMMENTARY_LABELS.some(k => label.includes(k))) return { field: 'commentary', prefix: '' };
+  if (PRECEDENT_PASTE_COMPACT_LABELS.some(k => label.includes(k))) return { field: 'compact', prefix: '' };
   if (PRECEDENT_PASTE_CONCLUSION_LABELS.some(k => label.includes(k))) return { field: 'conclusion', prefix: '' };
   if (PRECEDENT_PASTE_FEATURE_LABELS.some(k => label.includes(k))) return { field: 'feature', prefix: '' };
   if (PRECEDENT_PASTE_SUBJECT_LABELS.some(k => label.includes(k))) return { field: 'subject', prefix: '' };
   if (PRECEDENT_PASTE_EXAM_MENTION_LABELS.some(k => label.includes(k))) return { field: 'examMentions', prefix: '' };
+  // 「特徴（百選的理由）」は上でfeatureに振り分け済みのため、ここに来るのは
+  // 「百選：憲法Ⅰ（第8版）81事件」のような掲載情報の行だけ
+  if (PRECEDENT_PASTE_HYAKUSEN_LABELS.some(k => label.includes(k))) return { field: 'hyakusen', prefix: '' };
   return null;
 }
 // 「泉佐野市民会館事件（最判平成7年3月7日）」のように名前と判決日が
@@ -145,10 +154,34 @@ function precedentIndentParagraphStart(lines) {
   arr[0] = precedentIndentLine(arr[0]);
   return arr.join('\n');
 }
+// Claudeアプリなどの返答はMarkdown（「## ①事実」の見出し、「**判旨**：」の
+// 太字、```で囲んだコードブロック）で返ってくることが多いため、記号だけを
+// 取り除いて通常の「見出し：内容」形式と同じように読めるようにする
+function precedentStripMarkdown(line) {
+  if (/^```/.test(line)) return '';
+  return line.replace(/\*\*/g, '').replace(/^#{1,6}\s*/, '').trim();
+}
+// 「①事実」「③ 規範」「【④解説】」のように、見出しだけが1行になっている
+// 形式を認識する（丸数字・番号・括弧を外した残りが既知の見出しなら切り替える）
+// 本文中の短い1行（例：「判旨は妥当」「1. 規範の定立」）を見出しと誤認しない
+// よう、丸数字・【】が付いているか、見出し語そのもの（例：「解説」）の場合だけ見出しとみなす
+const PRECEDENT_HEADING_EXACT_LABELS = ['事実', '事案', '事案の概要', '判旨', '規範', '解説', '見直し版', '結論'];
+function precedentHeadingOnlyField(line) {
+  const m = line.match(/^(【)?\s*([①-⑳]|[0-9０-９]+[.．、)）]?)?\s*([^\s:：【】]{1,12})\s*(】)?$/);
+  if (!m) return null;
+  const hasMarker = !!(m[1] && m[4]) || /^[①-⑳]$/.test(m[2] || '');
+  if (!hasMarker && !PRECEDENT_HEADING_EXACT_LABELS.includes(m[3])) return null;
+  const mapped = precedentPasteLabelToField(m[3]);
+  return mapped && mapped.field !== 'basic' ? mapped.field : null;
+}
+// Open Codeなどで複数件まとめて作った場合に、「=====」の行で判例ごとに区切る
+function splitPrecedentPasteBlocks(text) {
+  return String(text || '').split(/^\s*={3,}\s*$/m).map(b => b.trim()).filter(Boolean);
+}
 function parsePrecedentPasteText(text) {
-  const rawLines = String(text || '').split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  const rawLines = String(text || '').split(/\r?\n/).map(l => precedentStripMarkdown(l.trim())).filter(l => l.length > 0);
   if (rawLines.length === 0) return null;
-  const fields = { basic: [], summary: [], holding: [], conclusion: [], feature: [], subject: [], examMentions: [] };
+  const fields = { basic: [], summary: [], holding: [], norm: [], commentary: [], compact: [], hyakusen: [], conclusion: [], feature: [], subject: [], examMentions: [] };
   let currentField = null;
   // 「【6-1】基本情報」のような番号付き見出し行から始まる形式では、判例名・
   // 判決日は見出しの下の本文（basicフィールド）から取り出すため、1行目を
@@ -169,6 +202,11 @@ function parsePrecedentPasteText(text) {
     // 「【6-2】事案（3〜4行）」のような番号付き見出し行。見出し自体には
     // 内容が無く、次の行から本文が続く形式のため、見出し行だけを認識して
     // 対象フィールドを切り替える（末尾の「（3〜4行）」等の注記は無視する）
+    const headingOnly = precedentHeadingOnlyField(line);
+    if (headingOnly) {
+      currentField = headingOnly;
+      continue;
+    }
     const sectionHeaderMatch = line.match(/^【[^】]*】\s*(.+)$/);
     if (sectionHeaderMatch) {
       const headerLabel = sectionHeaderMatch[1].replace(/[（(][^）)]*[）)]\s*$/, '').trim();
@@ -215,6 +253,11 @@ function parsePrecedentPasteText(text) {
     holding: precedentIndentParagraphStart(fields.holding),
     conclusion: precedentIndentParagraphStart(fields.conclusion),
     // 特徴・出題趣旨での言及は箇条書き（1行＝1項目）のため、字下げしない
+    norm: precedentIndentParagraphStart(fields.norm),
+    commentary: precedentIndentParagraphStart(fields.commentary),
+    // 見直し版は箇条書き（1行＝1項目）で作るため、字下げしない
+    compact: fields.compact.join('\n'),
+    hyakusen: fields.hyakusen.join(' '),
     feature: fields.feature.join('\n'),
     examMentions: fields.examMentions.join('\n')
   };
@@ -224,6 +267,11 @@ function initPrecedentPasteFeature() {
   const pasteInput = document.getElementById('precedentPasteInput');
   if (!parseBtn || !pasteInput) return;
   parseBtn.addEventListener('click', () => {
+    const blocks = splitPrecedentPasteBlocks(pasteInput.value);
+    if (blocks.length > 1) {
+      importPrecedentPasteBlocks(blocks);
+      return;
+    }
     const parsed = parsePrecedentPasteText(pasteInput.value);
     if (!parsed) {
       alert('貼り付けたテキストから判例名・判決日などを読み取れませんでした。「判例名（判決日）」の見出し行があるか確認してください。');
@@ -234,11 +282,90 @@ function initPrecedentPasteFeature() {
     if (parsed.subject) document.getElementById('precedentSubjectInput').value = parsed.subject;
     if (parsed.summary) document.getElementById('precedentSummaryInput').value = parsed.summary;
     if (parsed.holding) document.getElementById('precedentHoldingInput').value = parsed.holding;
+    if (parsed.norm) document.getElementById('precedentNormInput').value = parsed.norm;
+    if (parsed.commentary) document.getElementById('precedentCommentaryInput').value = parsed.commentary;
+    if (parsed.compact) document.getElementById('precedentCompactInput').value = parsed.compact;
+    if (parsed.hyakusen) document.getElementById('precedentHyakusenInput').value = parsed.hyakusen;
     if (parsed.conclusion) document.getElementById('precedentConclusionInput').value = parsed.conclusion;
     if (parsed.feature) document.getElementById('precedentFeatureInput').value = parsed.feature;
     if (parsed.examMentions) document.getElementById('precedentExamMentionsInput').value = parsed.examMentions;
     status.textContent = '📋 貼り付けた内容から自動入力しました。内容を確認してから保存してください。';
   });
+  const promptCopyBtn = document.getElementById('precedentPromptCopyBtn');
+  if (promptCopyBtn) promptCopyBtn.addEventListener('click', () => copyPrecedentPromptText());
+}
+// 複数件をまとめて貼り付けた場合は、フォームを経由せず確認ダイアログの後に
+// まとめて登録する（1件ずつ直したい場合は登録後に✏️から編集できる）
+function importPrecedentPasteBlocks(blocks) {
+  const parsedList = blocks.map(b => parsePrecedentPasteText(b)).filter(p => p && (p.name || p.date));
+  if (parsedList.length === 0) {
+    alert('貼り付けたテキストから判例を読み取れませんでした。判例ごとに「判例名（判決日）」の見出し行があるか確認してください。');
+    return;
+  }
+  const skipped = blocks.length - parsedList.length;
+  const names = parsedList.slice(0, 10).map(p => '・' + (p.name || p.date)).join('\n') + (parsedList.length > 10 ? '\n…ほか' + (parsedList.length - 10) + '件' : '');
+  if (!confirm(parsedList.length + '件の判例をまとめて登録しますか？' + (skipped ? '（読み取れなかった' + skipped + '件は除きます）' : '') + '\n\n' + names)) return;
+  const now = new Date().toISOString();
+  parsedList.forEach(p => {
+    precedents.push({
+      id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      ...p,
+      createdAt: now
+    });
+  });
+  savePrecedents();
+  const pasteInputEl = document.getElementById('precedentPasteInput');
+  if (pasteInputEl) pasteInputEl.value = '';
+  precedentRevealed = false;
+  renderPrecedentPage();
+  status.textContent = '⚖️ ' + parsedList.length + '件の判例をまとめて登録しました。';
+}
+
+/* 写真から5項目を作るための指示文。Claudeアプリ（Proプランの範囲内）や
+   Open Codeに貼り付けて使う。出力形式はparsePrecedentPasteText()がそのまま
+   読める形に揃えてある。著作権に配慮し、解説は丸写しせず要約させる */
+const PRECEDENT_PHOTO_PROMPT = [
+  'あなたは司法試験受験生の学習を手伝うアシスタントです。',
+  '私が自分で購入した判例百選のページの写真を送ります。写真を読み取り、私個人の復習用に、次の形式だけで出力してください（前置き・後書き・Markdownの記号は不要です）。',
+  '',
+  '判例名（裁判所・判決日・出典）',
+  '科目：（憲法・行政法・民法・商法・民事訴訟法・刑法・刑事訴訟法・労働法のいずれか）',
+  '百選：（書名・版・事件番号。例：憲法Ⅰ（第8版）81事件）',
+  '①事実：',
+  '（事案の概要。当事者・時系列・争点が分かるように5〜8行程度）',
+  '②判旨：',
+  '（判決の重要部分。結論に至る理由づけを原文の言い回しにできるだけ忠実に）',
+  '③規範：',
+  '（答案にそのまま書ける形の規範・判断枠組み。考慮要素があれば列挙）',
+  '④解説：',
+  '（論点の位置づけ、学説との関係、判例の射程、関連判例を自分の言葉で要約。解説文の丸写しはしない）',
+  '⑤見直し版：',
+  '・（試験直前に30秒で読める3〜5行の箇条書き。事案のキーワード→規範→結論）',
+  '',
+  'ルール：',
+  '・写真から読み取れない部分は推測で補わず「（読み取り不可）」と書く',
+  '・複数の判例をまとめて送った場合は、判例ごとに「=====」だけの行で区切る'
+].join('\n');
+function copyPrecedentPromptText() {
+  const done = () => { status.textContent = '📋 指示文をコピーしました。Claudeアプリに貼り付けて、百選の写真と一緒に送ってください。'; };
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = PRECEDENT_PHOTO_PROMPT;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (_) {}
+    document.body.removeChild(ta);
+    if (ok) done(); else prompt('コピーできなかったため、下の文章を手動でコピーしてください。', PRECEDENT_PHOTO_PROMPT);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(PRECEDENT_PHOTO_PROMPT).then(done, fallback);
+  } else {
+    fallback();
+  }
 }
 /* ▲▲▲ 新規追加：AIの要約を貼り付けて自動入力 ここまで ▲▲▲ */
 
@@ -249,6 +376,10 @@ function resetPrecedentForm() {
   document.getElementById('precedentSubjectInput').value = '';
   document.getElementById('precedentSummaryInput').value = '';
   document.getElementById('precedentHoldingInput').value = '';
+  document.getElementById('precedentNormInput').value = '';
+  document.getElementById('precedentCommentaryInput').value = '';
+  document.getElementById('precedentCompactInput').value = '';
+  document.getElementById('precedentHyakusenInput').value = '';
   document.getElementById('precedentConclusionInput').value = '';
   document.getElementById('precedentFeatureInput').value = '';
   document.getElementById('precedentExamMentionsInput').value = '';
@@ -275,6 +406,10 @@ function openPrecedentFormForEdit(p) {
   document.getElementById('precedentSubjectInput').value = p.subject || '';
   document.getElementById('precedentSummaryInput').value = p.summary || '';
   document.getElementById('precedentHoldingInput').value = p.holding || '';
+  document.getElementById('precedentNormInput').value = p.norm || '';
+  document.getElementById('precedentCommentaryInput').value = p.commentary || '';
+  document.getElementById('precedentCompactInput').value = p.compact || '';
+  document.getElementById('precedentHyakusenInput').value = p.hyakusen || '';
   document.getElementById('precedentConclusionInput').value = p.conclusion || '';
   document.getElementById('precedentFeatureInput').value = p.feature || '';
   document.getElementById('precedentExamMentionsInput').value = p.examMentions || '';
@@ -313,13 +448,18 @@ function renderPrecedentPage() {
     + '<button type="button" class="quizNavBtn" id="precedentPrevBtn"' + (precedentIndex === 0 ? ' disabled' : '') + '>◀ 前の判例</button>'
     + '<button type="button" class="quizNavBtn" id="precedentNextBtn"' + (precedentIndex >= list.length - 1 ? ' disabled' : '') + '>次の判例 ▶</button>'
     + '</div>';
-  html += '<div class="quizMeta">' + escapeHtml(p.subject || '未設定') + (p.date && p.name ? ' ｜ ' + escapeHtml(p.date) : '') + '</div>';
+  html += '<div class="quizMeta">' + escapeHtml(p.subject || '未設定') + (p.date && p.name ? ' ｜ ' + escapeHtml(p.date) : '') + (p.hyakusen ? ' ｜ 百選 ' + escapeHtml(p.hyakusen) : '') + '</div>';
   html += '<div class="quizTitle">' + escapeHtml(precedentDisplayTitle(p)) + '</div>';
   if (!precedentRevealed) {
     html += '<div class="quizShowBtn" id="precedentShowBtn">📖 内容を表示</div>';
   } else {
-    html += '<div class="quizBody"><strong>【事案の概要】</strong><br>' + (escapeHtml(p.summary || '（未入力）').replace(/\n/g, '<br>')) + '</div>';
-    html += '<div class="quizBody"><strong>【判旨】</strong><br>' + (escapeHtml(p.holding || '（未入力）').replace(/\n/g, '<br>')) + '</div>';
+    // 見直し版は試験直前に流し読みする用のため、入力済みなら一番上に出す
+    if (p.compact) html += '<div class="quizBody"><strong>【⑤見直し版】</strong><br>' + escapeHtml(p.compact).replace(/\n/g, '<br>') + '</div>';
+    html += '<div class="quizBody"><strong>【①事実】</strong><br>' + (escapeHtml(p.summary || '（未入力）').replace(/\n/g, '<br>')) + '</div>';
+    html += '<div class="quizBody"><strong>【②判旨】</strong><br>' + (escapeHtml(p.holding || '（未入力）').replace(/\n/g, '<br>')) + '</div>';
+    // 規範・解説は5項目形式で追加した欄のため、既存の判例では入力済みのときだけ表示する
+    if (p.norm) html += '<div class="quizBody"><strong>【③規範】</strong><br>' + escapeHtml(p.norm).replace(/\n/g, '<br>') + '</div>';
+    if (p.commentary) html += '<div class="quizBody"><strong>【④解説】</strong><br>' + escapeHtml(p.commentary).replace(/\n/g, '<br>') + '</div>';
     // 結論・特徴（百選的理由）は任意項目のため、入力済みのときだけ表示する
     // （既存の判例には無い項目なので、常に表示すると「（未入力）」だらけになってしまう）
     if (p.conclusion) html += '<div class="quizBody"><strong>【結論】</strong><br>' + escapeHtml(p.conclusion).replace(/\n/g, '<br>') + '</div>';
@@ -384,6 +524,10 @@ function initPrecedentFeature() {
     const subject = document.getElementById('precedentSubjectInput').value.trim();
     const summary = precedentTrimPreserveIndent(document.getElementById('precedentSummaryInput').value);
     const holding = precedentTrimPreserveIndent(document.getElementById('precedentHoldingInput').value);
+    const norm = precedentTrimPreserveIndent(document.getElementById('precedentNormInput').value);
+    const commentary = precedentTrimPreserveIndent(document.getElementById('precedentCommentaryInput').value);
+    const compact = document.getElementById('precedentCompactInput').value.trim();
+    const hyakusen = document.getElementById('precedentHyakusenInput').value.trim();
     const conclusion = precedentTrimPreserveIndent(document.getElementById('precedentConclusionInput').value);
     const feature = document.getElementById('precedentFeatureInput').value.trim();
     const examMentions = document.getElementById('precedentExamMentionsInput').value.trim();
@@ -394,13 +538,13 @@ function initPrecedentFeature() {
     if (precedentEditingId) {
       const idx = precedents.findIndex(p => p.id === precedentEditingId);
       if (idx !== -1) {
-        precedents[idx] = { ...precedents[idx], name, date, subject, summary, holding, conclusion, feature, examMentions };
+        precedents[idx] = { ...precedents[idx], name, date, subject, hyakusen, summary, holding, norm, commentary, compact, conclusion, feature, examMentions };
       }
       status.textContent = '✏️ 判例を更新しました。';
     } else {
       precedents.push({
         id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
-        name, date, subject, summary, holding, conclusion, feature, examMentions,
+        name, date, subject, hyakusen, summary, holding, norm, commentary, compact, conclusion, feature, examMentions,
         createdAt: new Date().toISOString()
       });
       status.textContent = '⚖️ 判例を追加しました。';
