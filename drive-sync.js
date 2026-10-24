@@ -8,7 +8,7 @@
   // （許可したメールアドレスかどうか）はGAS側（tools/gas-backup/code.gs）が
   // Googleに問い合わせて行う。CLIENT_IDは非公開情報ではない（クライアント側
   // コードに含めて問題ない）が、Google Cloud Console側でこのアプリのURL
-  // （https://blackout0802.github.io/ronsho-app/）が「承認済みのJavaScript
+  // （https://blackout-rain.github.io/ronsho-app/）が「承認済みのJavaScript
   // 生成元」と「承認済みのリダイレクトURI」の両方に登録されている必要がある
   const AUTH_CLIENT_ID = '1008108195377-3i95ujevlk1keuf02tcitnuikniie9al.apps.googleusercontent.com';
   // ログインして得たアクセストークンの保存先。端末ごとのログイン状態であり、
@@ -804,7 +804,7 @@
   // あり、そのまま使うとGoogle Cloud Consoleに登録したリダイレクトURIと
   // 一致せずredirect_uri_mismatchになってしまうため
   function authRedirectUri() {
-    return 'https://blackout0802.github.io/ronsho-app/';
+    return 'https://blackout-rain.github.io/ronsho-app/';
   }
   // URLSearchParamsは実装によって細かな挙動差があるため使わず、単純な文字列
   // 組み立て/分解だけで済ませる（Safari実機で「The string did not match the
