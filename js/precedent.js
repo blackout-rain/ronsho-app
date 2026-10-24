@@ -315,6 +315,65 @@ function initPrecedentPasteFeature() {
   });
   const promptCopyBtn = document.getElementById('precedentPromptCopyBtn');
   if (promptCopyBtn) promptCopyBtn.addEventListener('click', () => copyPrecedentPromptText());
+  PRECEDENT_JOIN_LINES_FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('paste', handlePrecedentJoinLinesPaste);
+  });
+}
+
+/* iPhoneの「テキスト認識表示」などで紙面から文字をコピーすると、紙面の
+   行の終わりごとに改行が入るため、文章欄への貼り付け時につなげる。
+   見直し版・特徴など箇条書きで書く欄は対象外 */
+const PRECEDENT_JOIN_LINES_FIELD_IDS = ['precedentSummaryInput', 'precedentHoldingInput', 'precedentNormInput', 'precedentCommentaryInput', 'precedentConclusionInput'];
+// 段落・項目の始まりとして改行を残す行頭（箇条書き記号・丸数字・ローマ数字・番号）
+const PRECEDENT_LINE_START_KEEP_RE = /^(?:[・●○■□◆◇▪•*\-]|[①-⑳]|[Ⅰ-Ⅻ]|[(（]?[0-9０-９]+[)）.．、]|[(（][ア-ンa-z][)）])/;
+function joinPrecedentWrappedLines(text) {
+  const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n').map(l => l.trim());
+  // 紙面の1行の長さ（最長の行）を基準に、それより短く「。」で終わる行を
+  // 段落の終わりとみなす。行末にたまたま「。」が来た満杯の行はつなげる
+  const fullLen = Math.max(0, ...lines.map(l => l.length));
+  const endsParagraph = (lastLine) => /[。．][」』）)]*$/.test(lastLine) && lastLine.length < fullLen * 0.85;
+  const paragraphs = [];
+  let current = '';
+  let lastLine = '';
+  lines.forEach(line => {
+    if (!line) {
+      // 空行は段落の区切りとして扱う
+      if (current) { paragraphs.push(current); current = ''; }
+      lastLine = '';
+      return;
+    }
+    if (current && (endsParagraph(lastLine) || PRECEDENT_LINE_START_KEEP_RE.test(line))) {
+      paragraphs.push(current);
+      current = line;
+    } else {
+      current += line;
+    }
+    lastLine = line;
+  });
+  if (current) paragraphs.push(current);
+  // 文字認識で日本語の文字の間に入った余計な半角スペースを取り除く
+  // 和文の段落は文頭を全角スペース1文字分下げる（箇条書き・Ⅰなどで始まる段落は除く）。
+  // 文字認識で日本語の文字の前後に入った余計な半角スペースは取り除く
+  return paragraphs
+    .map(p => p.replace(/([^\x00-\x7F])[ \t]+/g, '$1').replace(/[ \t]+(?=[^\x00-\x7F])/g, ''))
+    .map(p => PRECEDENT_LINE_START_KEEP_RE.test(p) ? p : precedentIndentLine(p))
+    .join('\n');
+}
+function handlePrecedentJoinLinesPaste(e) {
+  const clip = e.clipboardData || window.clipboardData;
+  if (!clip) return;
+  const raw = clip.getData('text');
+  if (!raw || !/\n/.test(raw)) return;
+  e.preventDefault();
+  const el = e.target;
+  const start = el.selectionStart, end = el.selectionEnd;
+  let joined = joinPrecedentWrappedLines(raw);
+  // 文の途中に貼り付けた場合は、先頭に字下げを付けない
+  const atLineStart = start === 0 || el.value[start - 1] === '\n';
+  if (!atLineStart) joined = joined.replace(/^　/, '');
+  el.setRangeText(joined, start, end, 'end');
+  el.dispatchEvent(new Event('input', { bubbles: true }));
 }
 // 複数件をまとめて貼り付けた場合は、フォームを経由せず確認ダイアログの後に
 // まとめて登録する（1件ずつ直したい場合は登録後に✏️から編集できる）
