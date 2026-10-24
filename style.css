@@ -1685,6 +1685,14 @@ table.pastMatrixTable th, table.pastMatrixTable td {
 .precedentFieldWide input { width: 100%; box-sizing: border-box; }
 .precedentFormBody .precedentField { flex: 1 1 100%; }
 .precedentFieldLabel { font-size: 12px; font-weight: bold; color: var(--text-secondary2); }
+/* 判例の本文欄（論証と同じく太字・色付けできる編集欄） */
+.precedentRich { max-height: 360px; }
+.precedentRich:empty::before { content: attr(data-placeholder); color: var(--text-secondary); pointer-events: none; }
+.precedentRichToolbar { flex: 1 1 100%; position: sticky; top: 0; z-index: 2; background: var(--tint-6); padding: 4px 0; }
+.precedentFormSectionTitle { flex: 1 1 100%; font-size: 13px; font-weight: bold; color: var(--text-primary, inherit); border-bottom: 1px solid var(--border-strong); padding-bottom: 3px; margin-top: 4px; }
+.precedentViewTabs { display: flex; gap: 6px; justify-content: center; margin: 8px 0; }
+.precedentViewTab { font-size: 13px; padding: 5px 14px; border: 1px solid var(--border-strong); border-radius: 999px; cursor: pointer; background: var(--card-bg); }
+.precedentViewTab.active { background: #0057e7; color: #fff; border-color: #0057e7; font-weight: bold; }
 /* ▲▲▲ 判例一覧タブ ここまで ▲▲▲ */
 /* ▲▲▲ 過去問ログ一覧マトリクス ここまで ▲▲▲ */
 /* ▼▼▼ 新規追加：頻出論点ランキング ここから ▼▼▼ */
