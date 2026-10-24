@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>論証集アプリ v29.5（条文タブを科目別・条文順に整理）</title>
+<title>論証集アプリ v29.6（CSV出力で暗記済みを除くか選択）</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0057e7">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@ try {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script><link rel="stylesheet" href="style.css">
 </head>
 <body>
-<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v29.5</span></h1>
+<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v29.6</span></h1>
 <div id="status"></div>
 <div id="syncConflictBanner" class="syncConflictBanner"></div>
 <div id="backupReminderBanner" class="backupReminderBanner"></div>
@@ -172,9 +172,10 @@ try {
 <div class="csvSubjectFilterRow">
 <label for="csvSubjectFilter">科目で絞り込み：</label>
 <select id="csvSubjectFilter"></select>
+<label class="csvExcludeMemorizedLabel"><input type="checkbox" id="csvExcludeMemorizedChk" checked> 暗記済みを除く</label>
 </div>
 <div id="csvTableWrap"></div>
-<button id="downloadBtn" style="display:none;">CSVをダウンロード（WordHolic形式・暗記済み除外）</button>
+<button id="downloadBtn" style="display:none;">CSVをダウンロード（WordHolic形式）</button>
 <button id="downloadLogBtn" style="display:none;">学習ログCSVをダウンロード</button>
 </div>
 </div>

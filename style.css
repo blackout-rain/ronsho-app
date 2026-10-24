@@ -275,7 +275,7 @@ h1 {
 }
 #duplicateResultsWrap:not(:empty) { margin-bottom: 20px; }
 /* ▲▲▲ 新規追加：データ入出力の各カードを1行レイアウトに ▲▲▲ */
-.csvSubjectFilterRow { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 13px; color: var(--text-secondary2); }
+.csvSubjectFilterRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 13px; color: var(--text-secondary2); }
 .csvSubjectFilterRow select { padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border-strong); font-size: 13px; }
 .dupCheckIntro { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
 .dupCheckEmpty { font-size: 13px; color: var(--text-secondary); margin-top: 10px; }
