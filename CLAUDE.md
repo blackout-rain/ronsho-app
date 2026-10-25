@@ -27,6 +27,8 @@
   - `sw.js` … Service Worker（オフラインキャッシュ）
   - `manifest.json` … PWAのホーム画面追加用設定
   - `tools/sync-test/run.js` … 同期ロジックの自動テスト（Node、Apps Scriptの実物無しで検証できるモック環境）
+  - `tools/unit-test/run.js` … Word解析・条文参照・書籍などの自動テストと、localStorageキーの同期／バックアップ登録漏れの自動チェック。新しいキーを端末固有として同期対象から外す場合は、このファイルの`DEVICE_LOCAL_KEYS`に理由つきで追記する
+  - `.github/workflows/test.yml` … プッシュ・PRのたびに上記2つのテストと構文チェックをGitHub Actionsで実行する
   - `tools/gas-backup/code.gs` … クラウド同期用Google Apps Script（GAS）の**参照用コピー**（後述、重要）
 
 # クラウド同期の仕組み（drive-sync.js）
@@ -37,6 +39,7 @@
 - 同期成功のたびに、Googleドライブの`ronsho-app-backups`フォルダにも自動でバックアップファイルを保存する（`maybeAutoBackupToDrive`、最短15分間隔）。同期用ファイル自体のGoogleドライブ「バージョン履歴」はGoogle側の都合で間引かれ当てにできないため、この自動バックアップが実質的な世代管理になっている。
 - 編集競合をマージで解決した際、内容が食い違っていた論証タイトルは `ronshoSyncConflictsV1` に記録され、他端末にも同期される（バナー→重複チェックで確認、✖で確認済み消去）。
 - 自動テストは `node tools/sync-test/run.js` で実行できる（Apps Scriptの実物無しでモックを使って検証）。**同期ロジックを変更したら必ずこれを実行し、全チェック合格を確認すること。**
+- それ以外のロジック（Word解析・条文参照など）を変更したら `node tools/unit-test/run.js` も実行する。Wordの文字色は `sanitizeHexColor()` で「#＋16進6桁」だけを通してから HTML に埋め込むこと（任意のHTMLを差し込まれないため）。
 
 # Googleアカウント認証（重要・経緯あり）
 
