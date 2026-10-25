@@ -202,6 +202,84 @@ document.getElementById('speechDictToggleBtn').addEventListener('click', () => {
 });
 renderSpeechDictList();
 
+// 読み上げ用に、音声合成が「えー」のような意味の無い音として読んでしまう
+// 記号を整える。仮名の直後以外にある長音記号「ー」（例：見出しの前後に
+// 置いた「ーーー」や、漢字・記号の直後の「ー」）は、直前の母音を伸ばす
+// 音として発音されてしまうため取り除き、区切り線として使われがちな
+// ダッシュ類は読点に置き換えて短い間にする
+function normalizeSpeechText(text) {
+  if (!text) return '';
+  return text
+    .replace(/[―—─━‐－]+/g, '、')
+    .replace(/(^|[^ぁ-ゖァ-ヺー])ー+/gm, '$1');
+}
+function speechTextFor(text) {
+  return applySpeechDict(normalizeSpeechText(text));
+}
+// 画面を消した（ロックした）ときも読み上げが止まりにくいよう、読み上げ中は
+// 無音の音声をループ再生してページを「音声再生中」の状態に保ち、ロック画面の
+// 再生コントロール（Media Session）にも対応させる。ブラウザの音声合成そのものは
+// 画面オフで止められることがあるため、端末によっては効かない
+let speechSilentAudio = null;
+function buildSilentWavUrl() {
+  const sampleRate = 8000;
+  const samples = sampleRate; // 1秒
+  const buf = new ArrayBuffer(44 + samples);
+  const v = new DataView(buf);
+  const writeStr = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+  writeStr(0, 'RIFF'); v.setUint32(4, 36 + samples, true); writeStr(8, 'WAVE');
+  writeStr(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+  writeStr(36, 'data'); v.setUint32(40, samples, true);
+  for (let i = 0; i < samples; i++) v.setUint8(44 + i, 128);
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+function speechBackgroundEnabled() {
+  const chk = document.getElementById('speechBackgroundChk');
+  return !chk || chk.checked;
+}
+function startSpeechBackgroundAudio() {
+  if (!speechBackgroundEnabled()) return;
+  try {
+    if (!speechSilentAudio) {
+      speechSilentAudio = new Audio(buildSilentWavUrl());
+      speechSilentAudio.loop = true;
+      speechSilentAudio.setAttribute('playsinline', '');
+    }
+    const p = speechSilentAudio.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch (e) {}
+  setupSpeechMediaSession();
+}
+function stopSpeechBackgroundAudio() {
+  if (speechSilentAudio) speechSilentAudio.pause();
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+}
+let speechMediaSessionReady = false;
+function setupSpeechMediaSession() {
+  if (!('mediaSession' in navigator)) return;
+  const e = speechQueue[speechIndex];
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: e ? e.title : '論証の読み上げ',
+      artist: e ? (e.subject || '') : '',
+      album: '論証集アプリ'
+    });
+    navigator.mediaSession.playbackState = 'playing';
+  } catch (err) {}
+  if (speechMediaSessionReady) return;
+  speechMediaSessionReady = true;
+  const handlers = {
+    play: () => startSpeech(),
+    pause: () => pauseSpeech(),
+    stop: () => stopSpeech(),
+    nexttrack: () => speechStep(1),
+    previoustrack: () => speechStep(-1)
+  };
+  Object.keys(handlers).forEach(action => {
+    try { navigator.mediaSession.setActionHandler(action, handlers[action]); } catch (err) {}
+  });
+}
 function speechSupported() {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
 }
@@ -417,6 +495,7 @@ function advanceSpeechAfterEntry() {
     speechIsPlaying = false;
     stopSpeechKeepAlive();
     releaseSpeechWakeLock();
+    stopSpeechBackgroundAudio();
     renderSpeechStatus('🎉 すべて読み上げが終了しました。');
   }
 }
@@ -432,10 +511,10 @@ function speakCurrentEntry() {
   window.speechSynthesis.cancel();
   const rateSel = document.getElementById('speechRateSelect');
   const rate = rateSel ? Number(rateSel.value) || 1 : 1;
-  const titleUtterance = new SpeechSynthesisUtterance(applySpeechDict(e.title));
+  const titleUtterance = new SpeechSynthesisUtterance(speechTextFor(e.title));
   titleUtterance.lang = 'ja-JP';
   titleUtterance.rate = rate;
-  const bodyUtterance = new SpeechSynthesisUtterance(applySpeechDict(e.body));
+  const bodyUtterance = new SpeechSynthesisUtterance(speechTextFor(e.body));
   bodyUtterance.lang = 'ja-JP';
   bodyUtterance.rate = rate;
   titleUtterance.onend = () => {
@@ -450,6 +529,7 @@ function speakCurrentEntry() {
     speechIsPlaying = false;
     stopSpeechKeepAlive();
     releaseSpeechWakeLock();
+    stopSpeechBackgroundAudio();
     renderSpeechStatus('読み上げ中にエラーが発生しました。');
   };
   bodyUtterance.onend = advanceSpeechAfterEntry;
@@ -458,10 +538,12 @@ function speakCurrentEntry() {
     speechIsPlaying = false;
     stopSpeechKeepAlive();
     releaseSpeechWakeLock();
+    stopSpeechBackgroundAudio();
     renderSpeechStatus('読み上げ中にエラーが発生しました。');
   };
   renderSpeechStatus('🔊 読み上げ中… (' + (speechIndex + 1) + ' / ' + speechQueue.length + ')');
   startSpeechKeepAlive();
+  setupSpeechMediaSession();
   window.speechSynthesis.speak(titleUtterance);
 }
 function startSpeech() {
@@ -470,6 +552,7 @@ function startSpeech() {
     return;
   }
   acquireSpeechWakeLock();
+  startSpeechBackgroundAudio();
   if (window.speechSynthesis.paused && speechQueue.length > 0) {
     window.speechSynthesis.resume();
     speechIsPlaying = true;
@@ -494,6 +577,7 @@ function pauseSpeech() {
   stopSpeechKeepAlive();
   window.speechSynthesis.pause();
   releaseSpeechWakeLock();
+  stopSpeechBackgroundAudio();
   renderSpeechStatus('⏸ 一時停止中');
 }
 function stopSpeech() {
@@ -503,6 +587,7 @@ function stopSpeech() {
   stopSpeechKeepAlive();
   window.speechSynthesis.cancel();
   releaseSpeechWakeLock();
+  stopSpeechBackgroundAudio();
   renderSpeechStatus('⏹ 停止しました');
 }
 function speechStep(delta) {

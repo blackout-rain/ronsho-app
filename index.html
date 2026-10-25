@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>論証集アプリ v30.3（Word読み込みの安全性強化・自動テスト追加）</title>
+<title>論証集アプリ v30.4（読み上げの「えー」という音を解消し、画面オフでも読み上げを続けられるよう改善）</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0057e7">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@ try {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script><link rel="stylesheet" href="style.css">
 </head>
 <body>
-<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v30.3</span></h1>
+<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v30.4</span></h1>
 <div id="status"></div>
 <div id="syncConflictBanner" class="syncConflictBanner"></div>
 <div id="backupReminderBanner" class="backupReminderBanner"></div>
@@ -115,6 +115,7 @@ try {
 <option value="0">なし</option>
 </select>
 <label><input type="checkbox" id="speechIncludeMemorizedChk"> 暗記済みも含める</label>
+<label title="読み上げ中に無音の音声を流して、画面を消しても読み上げが止まりにくくします"><input type="checkbox" id="speechBackgroundChk" checked> 画面オフでも続ける</label>
 <label for="speechRateSelect">速さ：</label>
 <select id="speechRateSelect">
 <option value="0.75">0.75倍</option>
