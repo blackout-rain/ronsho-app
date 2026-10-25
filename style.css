@@ -1522,6 +1522,7 @@ input[type=file] { display:none; }
 }
 .speechFuriganaWord:focus { border-color: #0057e7; box-shadow: 0 0 0 2px rgba(0, 87, 231, 0.2); }
 .speechFuriganaWord.speechFuriganaUnregistered { color: var(--text-secondary); border-style: dashed; }
+.speechInvisibleChar { color: #d93025; font-weight: bold; }
 .speechEmpty { color: var(--text-secondary); font-size: 14px; padding: 30px; }
 .speechDictForm { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .speechDictForm input { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-strong); font-size: 13px; }
