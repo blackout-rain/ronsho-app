@@ -207,9 +207,13 @@ renderSpeechDictList();
 // 置いた「ーーー」や、漢字・記号の直後の「ー」）は、直前の母音を伸ばす
 // 音として発音されてしまうため取り除き、区切り線として使われがちな
 // ダッシュ類は読点に置き換えて短い間にする
+// 画面では見えないが音声合成が雑音のように読んでしまう文字（Wordなどから
+// 貼り付けた際に混ざるゼロ幅文字・ソフトハイフン・制御文字・私用領域の記号など）
+const SPEECH_INVISIBLE_CHAR_RE = /[\u0000-\u0009\u000B-\u001F\u007F-\u009F\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180E\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0\uFFF0-\uFFFF\uE000-\uF8FF]/g;
 function normalizeSpeechText(text) {
   if (!text) return '';
   return text
+    .replace(SPEECH_INVISIBLE_CHAR_RE, '')
     .replace(/[―—─━‐－]+/g, '、')
     .replace(/(^|[^ぁ-ゖァ-ヺー])ー+/gm, '$1');
 }
@@ -404,7 +408,8 @@ function buildFuriganaHtml(text) {
       return '<span class="speechFuriganaWord speechFuriganaUnregistered" contenteditable="true" data-word="' + escapeHtml(seg.word)
         + '" title="まだ読み方辞書に無い単語です。読み方を入力すると登録されます">' + escapeHtml(seg.word) + '</span>';
     }
-    return escapeHtml(seg.text).replace(/\n/g, '<br>');
+    // 見えない文字は、読み仮名カード上で「⚠」として場所が分かるように表示する
+    return escapeHtml(seg.text).replace(SPEECH_INVISIBLE_CHAR_RE, '<span class="speechInvisibleChar" title="見えない文字（読み上げでは飛ばします）">⚠</span>').replace(/\n/g, '<br>');
   }).join('');
 }
 function renderSpeechFuriganaCard(e) {
