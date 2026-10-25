@@ -659,6 +659,18 @@ function isTitleLine(runList) {
   return /^[★☆]+/.test(runListToText(runList).trim());
 }
 const SECTION_STOP_WORDS = ['サブ', '今後追加', '暗記'];
+// 色の値は style 属性にそのまま埋め込むため、「#」＋16進6桁の形以外は捨てる
+// （細工したWordファイルや同期データから任意のHTMLを差し込まれないようにするため）
+function sanitizeHexColor(color) {
+  return (typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color)) ? color : null;
+}
+// Wordの <w:color w:val="..."> の値を色に変換する。黒・自動・不正な値は色なし扱い
+function docxColorValToHex(val) {
+  if (!val) return null;
+  const v = String(val).toLowerCase();
+  if (v === '000000' || v === 'auto') return null;
+  return sanitizeHexColor('#' + val);
+}
 function escapeHtml(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -670,8 +682,9 @@ function buildBodyHtml(bodyRunLines) {
       const text = isFirstRun ? r.text.replace(/^[\s\u3000]+/, '') : r.text;
       const escaped = escapeHtml(text);
       let content = (r.bold && r.color) ? '<b>' + escaped + '</b>' : escaped;
-      if (r.color) {
-        content = '<span style="color:' + r.color + ';">' + content + '</span>';
+      const safeColor = sanitizeHexColor(r.color);
+      if (safeColor) {
+        content = '<span style="color:' + safeColor + ';">' + content + '</span>';
       }
       lineHtml += content;
       isFirstRun = false;
@@ -683,7 +696,8 @@ function buildYearHtml(yearStr) {
   if (!yearStr) return '';
   const tokens = yearStr.split(';').filter(Boolean);
   return tokens.map(tokStr => {
-    const [text, color] = tokStr.split('|');
+    const [text, rawColor] = tokStr.split('|');
+    const color = sanitizeHexColor(rawColor);
     const escaped = escapeHtml(text);
     return color ? '<span style="color:' + color + '; font-weight:bold;">' + escaped + '</span>' : escaped;
   }).join(', ');
@@ -916,14 +930,8 @@ async function parseSingleFile(file) {
       let text = '';
       for (let t of texts) text += t.textContent;
       if (text === '') continue;
-      let color = null;
       const colorEls = r.getElementsByTagName('w:color');
-      if (colorEls.length > 0) {
-        const v = colorEls[0].getAttribute('w:val');
-        if (v && v.toLowerCase() !== '000000' && v.toLowerCase() !== 'auto') {
-          color = '#' + v;
-        }
-      }
+      const color = colorEls.length > 0 ? docxColorValToHex(colorEls[0].getAttribute('w:val')) : null;
       const boldEls = r.getElementsByTagName('w:b');
       const bold = boldEls.length > 0 && boldEls[0].getAttribute('w:val') !== '0' && boldEls[0].getAttribute('w:val') !== 'false';
       runList.push({ text: text, color: color, bold: bold });
