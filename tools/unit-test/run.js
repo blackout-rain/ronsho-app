@@ -228,6 +228,21 @@ console.log('\n■ localStorageキーの同期登録漏れ');
     fields.filter(f => !NOT_APPLIED.includes(f) && !has(new RegExp('data\\.' + f + '\\b|^\\s*' + f + ": 'ronsho", 'm'), backupCode)), []);
 }
 
+console.log('\n■ オフライン動作（外部スクリプトに頼らない）');
+{
+  const html = read('index.html');
+  const sw = read('sw.js');
+  const srcs = [...html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map(m => m[1]);
+  // Googleのログイン等、オンライン前提の機能のために読む外部スクリプトがあればここに理由つきで書く
+  const ALLOWED_EXTERNAL = {};
+  eq('外部サイトのスクリプトを読み込んでいない', srcs.filter(s => /^https?:/.test(s) && !ALLOWED_EXTERNAL[s]), []);
+  const precache = new Set([...(sw.match(/PRECACHE_URLS = \[([\s\S]*?)\];/) || [])[1].matchAll(/'([^']+)'/g)].map(m => m[1].replace(/^\.\//, '')));
+  eq('読み込むスクリプトはすべて Service Worker で事前キャッシュしている',
+    srcs.filter(s => !/^https?:/.test(s) && !precache.has(s.replace(/^\.\//, ''))), []);
+  eq('事前キャッシュするファイルがすべて実在する',
+    [...precache].filter(p => p && !fs.existsSync(path.join(ROOT, p))), []);
+}
+
 console.log('');
 if (failures > 0) {
   console.log('❌ ' + failures + '件のチェックが失敗しました');
