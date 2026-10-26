@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ronsho-app-cache-v226';
+const CACHE_NAME = 'ronsho-app-cache-v227';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -24,7 +24,7 @@ const PRECACHE_URLS = [
   './manifest.json',
   './assets/icon-192.png',
   './assets/icon-512.png',
-  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+  './vendor/jszip/jszip.min.js'
 ];
 
 self.addEventListener('install', (event) => {
