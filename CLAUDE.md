@@ -31,6 +31,15 @@
   - `.github/workflows/test.yml` … プッシュ・PRのたびに上記2つのテストと構文チェックをGitHub Actionsで実行する
   - `tools/gas-backup/code.gs` … クラウド同期用Google Apps Script（GAS）の**参照用コピー**（後述、重要）
 
+## 条文（js/lawref.js）
+
+- 論証本文の「民法90条」などに下線リンクを付け、押すとe-Gov法令API（v1、CORS開放済み）から条文を出す。1条ずつ取得したものは `ronshoLawCacheV1`（localStorage、最大300件、端末固有）に保存。
+- **全条ダウンロード（v31.0〜）**：「📜 条文」タブ →「📖 全条を読む」で、`LAWREF_LAWS` のうち `noFull` の無い17法（民事再生法・破産法以外）を `api/1/lawdata/` から法律まるごと取得し、IndexedDB `ronshoLawFullDB`（`laws`＝本体、`meta`＝一覧用）に保存する。localStorageには入らない大きさ（XMLで約11MB、保存後約3MB）のためIndexedDBを使う。再ダウンロードできる端末内の控えなので**同期・バックアップの対象外**（`tools/unit-test/run.js` の `DEVICE_LOCAL_KEYS` に登録済み）。
+  - 条文リンクは、その法律がダウンロード済みならネットを使わずそこから表示する（`lawrefGetArticle` → `lawfullLookup`）。
+  - 本則（MainProvision）だけを読み、附則は条番号が重なるので含めない。範囲削除の条（`Num="38:84"`）は範囲として引ける。
+  - XMLの解析関数は firstChild / nextSibling / nodeType / tagName / nodeValue / getAttribute だけを使う（Nodeのテストで小さなXML読み取り器を渡して検証するため）。ルビの読み（Rt）は捨て、整形用の改行は取り除く。
+- 条文リンクのクリックは document の委任リスナーで拾う。本文欄・空欄などのクリック処理で `stopPropagation()` する場合は、**`.lawRef` かどうかの判定を `stopPropagation()` より前に**置くこと（後に置くと条文が開かなくなる。v31.0で論証一覧・問題演習の空欄の不具合を修正済み）。
+
 # クラウド同期の仕組み（drive-sync.js）
 
 - 同期用バックエンドは、Google Apps Script（GAS）のウェブアプリ（`drive-sync.js`内の`SYNC_URL`）。GETで現在の全データ(JSON)を取得、POSTでrevision番号ベースの楽観ロックにより丸ごと上書き保存する。マージ・競合解決はすべてクライアント側（`drive-sync.js`）で行う。

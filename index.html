@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>論証集アプリ v30.6（Word読み込み用ライブラリを同梱しオフライン対応）</title>
+<title>論証集アプリ v31.0（主要17法の全条をダウンロードしオフラインで通読・検索）</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0057e7">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@ try {
 <script src="vendor/jszip/jszip.min.js"></script><link rel="stylesheet" href="style.css">
 </head>
 <body>
-<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v30.6</span></h1>
+<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v31.0</span></h1>
 <div id="status"></div>
 <div id="syncConflictBanner" class="syncConflictBanner"></div>
 <div id="backupReminderBanner" class="backupReminderBanner"></div>
@@ -330,6 +330,11 @@ try {
 <!-- ▲▲▲ 新規追加：書籍タブ ここまで ▲▲▲ -->
 <!-- ▼▼▼ 新規追加：条文ストックタブ（既存タブ・既存機能には一切影響しません） ▼▼▼ -->
 <div id="lawStockPage" class="page">
+<div class="progressViewToggle lawStockModeTabs">
+<button type="button" class="progressViewToggleBtn lawStockModeBtn active" data-mode="stock">📜 開いた条文</button>
+<button type="button" class="progressViewToggleBtn lawStockModeBtn" data-mode="read">📖 全条を読む</button>
+</div>
+<div id="lawStockStockPane">
 <div class="dataIoSection oneLine">
 <span class="dupCheckIntro">論証本文の条文リンクから取得した条文がここに集まります。オフラインでも確認できます。</span>
 <button type="button" id="lawStockClearBtn" class="stackBtn">🗑️ すべて削除</button>
@@ -337,6 +342,24 @@ try {
 <div id="lawStockSubjectTabs" class="progressViewToggle" style="flex-wrap:wrap;"></div>
 <div id="lawStockProgress" class="quizProgress"></div>
 <div id="lawStockArea"></div>
+</div>
+<div id="lawStockReadPane" style="display:none;">
+<details id="lawFullDlBox" class="dataIoSection lawFullDlBox">
+<summary class="dataIoSectionTitle">📥 全条ダウンロード（オフライン用）</summary>
+<div class="dupCheckIntro">法律の全条をe-Gov法令検索からまとめて取得し、この端末に保存します。保存した法律は、電波が無くても条文リンクから表示でき、下で目次から通読・検索できます。全部で約10MBです。端末ごとに保存するため、他の端末では別にダウンロードしてください（同期はされません）。</div>
+<div class="bookActionsRow lawFullBulkRow">
+<button type="button" id="lawFullDlAllBtn" class="stackBtn">📥 未取得をまとめてダウンロード</button>
+<button type="button" id="lawFullUpdateAllBtn" class="stackBtn">🔄 すべて更新</button>
+</div>
+<div id="lawFullDlList"></div>
+</details>
+<div id="lawReadControls" class="lawReadControls" style="display:none;">
+<select id="lawReadLawSelect" aria-label="読む法律"></select>
+<span class="lawReadInputRow"><input type="text" id="lawReadJumpInput" inputmode="text" placeholder="条番号（例：709、121の2）"><button type="button" id="lawReadJumpBtn" class="stackBtn">移動</button></span>
+<span class="lawReadInputRow"><input type="search" id="lawReadSearchInput" placeholder="🔍 この法律の条文から検索"><button type="button" id="lawReadSearchBtn" class="stackBtn">検索</button></span>
+</div>
+<div id="lawReadArea" class="lawReadArea"></div>
+</div>
 </div>
 <!-- ▲▲▲ 新規追加：条文ストックタブ ここまで ▲▲▲ -->
 <!-- ▼▼▼ 新規追加：その他タブ（ショートカットキー設定） ▼▼▼ -->
@@ -442,7 +465,7 @@ try {
 </div>
 <div class="dataIoSection">
 <div class="dataIoSectionTitle">📜 条文リンクの表示方法</div>
-<div class="dupCheckIntro">論証本文中の「民法90条」のような条文参照（下線付き）を押したときの表示方法です。条文本文はe-Gov法令検索から取得し、端末内にキャッシュします。</div>
+<div class="dupCheckIntro">論証本文中の「民法90条」のような条文参照（下線付き）を押したときの表示方法です。条文本文はe-Gov法令検索から取得し、端末内にキャッシュします。「📜 条文」タブの「📖 全条を読む」で法律ごとに全条をダウンロードしておくと、オフラインでも表示できます。</div>
 <div class="settingsInlineRow">
 <label><input type="radio" name="lawRefView" value="popup" checked> ポップアップ</label>
 <label><input type="radio" name="lawRefView" value="inline"> その場に展開</label>

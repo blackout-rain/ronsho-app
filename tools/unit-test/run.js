@@ -171,6 +171,150 @@ console.log('\n■ 条文の表示（項・号）');
   check('条文の文字はエスケープされる', html.includes('甲&lt;b&gt;'), html);
 }
 
+// e-Govの法令XMLを読むための、テスト用の小さなXML読み取り器。
+// アプリの解析処理が使う firstChild / nextSibling / nodeType / tagName / nodeValue / getAttribute だけを用意する
+function parseXmlLite(xml) {
+  const decode = t => t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+  const mk = (tagName, attrs) => ({ nodeType: 1, tagName, attrs, children: [], getAttribute(n) { return n in this.attrs ? this.attrs[n] : null; } });
+  const root = { nodeType: 9, children: [] };
+  const stack = [root];
+  const re = /<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<\/([A-Za-z0-9_]+)\s*>|<([A-Za-z0-9_]+)((?:\s+[A-Za-z0-9_:]+="[^"]*")*)\s*(\/?)>|([^<]+)/g;
+  let m;
+  while ((m = re.exec(xml)) !== null) {
+    const top = stack[stack.length - 1];
+    if (m[1]) { stack.pop(); continue; }
+    if (m[2]) {
+      const attrs = {};
+      for (const a of (m[3] || '').matchAll(/([A-Za-z0-9_:]+)="([^"]*)"/g)) attrs[a[1]] = decode(a[2]);
+      const el = mk(m[2], attrs);
+      top.children.push(el);
+      if (!m[4]) stack.push(el);
+      continue;
+    }
+    if (m[5] !== undefined) top.children.push({ nodeType: 3, nodeValue: decode(m[5]) });
+  }
+  const link = (n) => {
+    (n.children || []).forEach((c, i, arr) => { c.nextSibling = arr[i + 1] || null; link(c); });
+    n.firstChild = (n.children && n.children[0]) || null;
+  };
+  link(root);
+  root.documentElement = root.children.find(c => c.nodeType === 1);
+  return root;
+}
+const SAMPLE_LAW_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<DataRoot>
+  <Result><Code>0</Code><Message/></Result>
+  <ApplData>
+    <LawFullText>
+      <Law Era="Meiji" Num="089">
+        <LawNum>明治二十九年法律第八十九号</LawNum>
+        <LawBody>
+          <LawTitle>見本法</LawTitle>
+          <Preamble>
+            <Paragraph Num="1"><ParagraphNum/><ParagraphSentence><Sentence>前文の文。</Sentence></ParagraphSentence></Paragraph>
+          </Preamble>
+          <MainProvision>
+            <Part Num="1">
+              <PartTitle>第一編　総則</PartTitle>
+              <Chapter Num="1">
+                <ChapterTitle>第一章　通則</ChapterTitle>
+                <Article Num="1">
+                  <ArticleCaption>（失<Ruby>踪<Rt>そう</Rt></Ruby>の宣告）</ArticleCaption>
+                  <ArticleTitle>第一条</ArticleTitle>
+                  <Paragraph Num="1">
+                    <ParagraphNum/>
+                    <ParagraphSentence>
+                      <Sentence Num="1">第一文。</Sentence>
+                      <Sentence Num="2">第二文&amp;。</Sentence>
+                    </ParagraphSentence>
+                    <Item Num="1">
+                      <ItemTitle>一</ItemTitle>
+                      <ItemSentence>
+                        <Column Num="1"><Sentence>法人</Sentence></Column>
+                        <Column Num="2"><Sentence>法律上の人をいう。</Sentence></Column>
+                      </ItemSentence>
+                    </Item>
+                  </Paragraph>
+                  <Paragraph Num="2">
+                    <ParagraphNum>２</ParagraphNum>
+                    <ParagraphSentence><Sentence>読み替える。</Sentence></ParagraphSentence>
+                    <TableStruct><Table><TableRow><TableColumn><Sentence>上欄</Sentence></TableColumn><TableColumn><Sentence>下欄</Sentence></TableColumn></TableRow></Table></TableStruct>
+                  </Paragraph>
+                </Article>
+                <Article Num="2_2">
+                  <ArticleTitle>第二条の二</ArticleTitle>
+                  <Paragraph Num="1"><ParagraphNum/><ParagraphSentence><Sentence>枝番号の条。</Sentence></ParagraphSentence></Paragraph>
+                </Article>
+              </Chapter>
+              <Chapter Num="2">
+                <ChapterTitle>第二章　人</ChapterTitle>
+                <Section Num="1">
+                  <SectionTitle>第一節　権利能力</SectionTitle>
+                  <Article Num="3">
+                    <ArticleTitle>第三条</ArticleTitle>
+                    <Paragraph Num="1"><ParagraphNum/><ParagraphSentence><Sentence>私権の享有は、出生に始まる。</Sentence></ParagraphSentence></Paragraph>
+                  </Article>
+                </Section>
+                <Section Num="2">
+                  <SectionTitle>第二節　削除</SectionTitle>
+                  <Article Num="38:84">
+                    <ArticleTitle>第三十八条から第八十四条まで</ArticleTitle>
+                    <Paragraph Num="1"><ParagraphNum/><ParagraphSentence><Sentence>削除</Sentence></ParagraphSentence></Paragraph>
+                  </Article>
+                </Section>
+              </Chapter>
+            </Part>
+          </MainProvision>
+          <SupplProvision>
+            <Article Num="1"><ArticleTitle>第一条</ArticleTitle><Paragraph Num="1"><ParagraphNum/><ParagraphSentence><Sentence>附則の文。</Sentence></ParagraphSentence></Paragraph></Article>
+          </SupplProvision>
+        </LawBody>
+      </Law>
+    </LawFullText>
+  </ApplData>
+</DataRoot>`;
+
+console.log('\n■ 全条ダウンロード：法令XMLの読み取り');
+{
+  const rec = app('lawfullParseDoc')(parseXmlLite(SAMPLE_LAW_XML), 'minpou');
+  check('読み取れる', !!rec);
+  eq('法律名・法令番号', [rec.lawTitle, rec.lawNum], ['見本法', '明治二十九年法律第八十九号']);
+  eq('条の数（前文・附則は数えない）', rec.count, 4);
+  eq('並び（見出しと条）', rec.items.map(it => it.h ? 'H' + it.h + ':' + it.t : it.k),
+    ['preamble', 'H1:第一編　総則', 'H2:第一章　通則', '1', '2-2', 'H2:第二章　人', 'H3:第一節　権利能力', '3', 'H3:第二節　削除', '38:84']);
+  const a1 = rec.items[3];
+  eq('ルビの読みを本文に混ぜない', a1.caption, '（失踪の宣告）');
+  eq('複数の文は整形用の改行・空白を入れずにつなぐ', a1.paras[0].text, '第一文。第二文&。');
+  eq('号の欄は全角空白で区切る', [a1.paras[0].items[0].label, a1.paras[0].items[0].text], ['一', '法人　法律上の人をいう。']);
+  eq('表を読む', a1.paras[1].tables, [[['上欄', '下欄']]]);
+  eq('範囲削除の条は範囲を持つ', [rec.items[9].num, rec.items[9].to], [38, 84]);
+  const bad = SAMPLE_LAW_XML.replace('<Code>0</Code>', '<Code>1</Code>');
+  eq('エラー応答は読み取らない', app('lawfullParseDoc')(parseXmlLite(bad), 'minpou'), null);
+  eq('条番号の属性', ['90', '121_2', '32_3_2', '618:620', 'x'].map(n => app('lawfullParseArticleNum')(n)),
+    [{ k: '90', num: 90 }, { k: '121-2', num: 121 }, { k: '32-3-2', num: 32 }, { k: '618:620', num: 618, to: 620 }, null]);
+
+  const find = app('lawfullFindIn');
+  eq('条番号で探す', [find(rec, 1, null), find(rec, 2, 2), find(rec, 3, null)], [3, 4, 7]);
+  eq('範囲削除の条にも当たる', [find(rec, 38, null), find(rec, 50, null), find(rec, 84, null)], [9, 9, 9]);
+  eq('無い条は null', [find(rec, 2, null), find(rec, 85, null), find(rec, 3, 2)], [null, null, null]);
+
+  const sectionOf = app('lawfullSectionOf');
+  eq('条を含むいちばん細かい区切り', sectionOf(rec, 7), { start: 6, end: 8 });
+  eq('前文は最初の見出しの手前まで', sectionOf(rec, 0), { start: 0, end: 1 });
+  eq('編の見出しからは編の終わりまで', app('lawfullSectionRange')(rec, 1), { start: 1, end: 10 });
+  eq('次の区切り', app('lawfullNextSection')(rec, { start: 2, end: 5 }), { start: 6, end: 8 });
+  eq('前の区切り', app('lawfullPrevSection')(rec, { start: 6, end: 8 }), { start: 2, end: 5 });
+  eq('最後の次は無い', app('lawfullNextSection')(rec, { start: 8, end: 10 }), null);
+  eq('見出しの道筋', app('lawfullBreadcrumb')(rec, 6), ['第一編　総則', '第二章　人', '第一節　権利能力']);
+  eq('条文内検索（空白区切りはすべて含む）', [app('lawfullSearch')(rec, '出生'), app('lawfullSearch')(rec, '法人 第一文'), app('lawfullSearch')(rec, '附則')], [[7], [3], []]);
+  eq('条番号の入力', ['709', '709条', '第七百九条', '121の2', '121条の2', '１２１の２', 'あ'].map(t => app('lawfullParseJump')(t)),
+    [{ num: 709, branch: null }, { num: 709, branch: null }, { num: 709, branch: null }, { num: 121, branch: 2 }, { num: 121, branch: 2 }, { num: 121, branch: 2 }, null]);
+  const html = app('lawrefArticleBodyHtml')(a1, null);
+  check('表を表示する', html.includes('<table class="lawRefTable"><tr><td>上欄</td><td>下欄</td></tr></table>'), html);
+  check('検索語の強調はタグの中を壊さない', app('lawReadHighlight')('<div class="lawRefPara">法人</div>', ['法人', 'class']) === '<div class="lawRefPara"><mark>法人</mark></div>');
+  eq('全条ダウンロードの対象（民事再生法・破産法を除く17法）', [app('LAWFULL_LIDS.length'), app('LAWFULL_LIDS.includes("hasan")'), app('LAWFULL_LIDS.includes("minsaisei")')], [17, false, false]);
+}
+
 console.log('\n■ 条文タブの並び順');
 {
   const cmp = app('lawrefStockCompare');
@@ -195,6 +339,7 @@ console.log('\n■ localStorageキーの同期登録漏れ');
   const DEVICE_LOCAL_KEYS = {
     ronshoLastImportDiffV1: '直前のWord読み込みの差分表示（端末内の一時表示）',
     ronshoLawCacheV1: 'e-Govから取得した条文のキャッシュ（再取得できる）',
+    ronshoLawFullDB: '全条ダウンロードの保存先（IndexedDBの名前。約10MBあり、各端末で再ダウンロードできる）',
     ronshoPastMatrixEraV1: '過去問マトリクスの令和/平成の表示切替（見た目だけ）',
     ronshoXpMigratedFromLegacyV1: 'XPの移行処理済みフラグ（端末ごとの内部管理）',
     ronshoXpPastExamMigratedV1: 'XPの移行処理済みフラグ（端末ごとの内部管理）'
