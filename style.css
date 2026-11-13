@@ -1963,3 +1963,49 @@ html { scrollbar-gutter: stable; }
 .importDiffGroupTitle { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
 /* ▲▲▲ 復習キュー・正答率・タグ別進捗・条文ストック・書籍紐付け・読込差分 ここまで ▲▲▲ */
 .lawStockSubjectBtn { flex: 0 0 auto; }
+/* ▼▼▼ 全条ダウンロード・全条を読む（通読・条番号ジャンプ・検索） ▼▼▼ */
+.lawStockModeTabs { flex-wrap: wrap; }
+.lawRefTableWrap { overflow-x: auto; margin: 4px 0 8px; }
+.lawRefTable { border-collapse: collapse; font-size: 12px; line-height: 1.6; }
+.lawRefTable td { border: 1px solid var(--border, #dbe4f0); padding: 4px 6px; vertical-align: top; min-width: 6em; }
+.lawRefReadMoreBtn { margin-left: 6px; font-size: 11px; padding: 2px 8px; }
+.lawFullDlBox > summary { cursor: pointer; margin-bottom: 6px; }
+.lawFullBulkRow { flex-wrap: wrap; margin: 8px 0; }
+.lawFullRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  padding: 6px 0; border-bottom: 1px solid var(--border, #eef2f7);
+}
+.lawFullRowText { display: flex; flex-direction: column; min-width: 0; }
+.lawFullName { font-weight: 700; font-size: 14px; }
+.lawFullState { font-size: 12px; color: var(--text-secondary); }
+.lawReadControls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+.lawReadControls select { max-width: 100%; }
+.lawReadInputRow { display: inline-flex; gap: 4px; align-items: center; max-width: 100%; }
+.lawReadInputRow input { width: 13em; max-width: calc(100vw - 110px); }
+.lawReadArea { font-size: 14px; line-height: 1.9; }
+.lawReadTitle { font-weight: 800; font-size: 16px; margin: 6px 0 8px; }
+.lawReadTocItem {
+  cursor: pointer; padding: 5px 6px; border-bottom: 1px solid var(--border, #eef2f7); color: var(--text);
+}
+.lawReadTocItem:hover { background: rgba(0, 87, 231, 0.06); }
+.lawReadTocLevel1 { font-weight: 800; }
+.lawReadTocLevel2 { padding-left: 1.2em; font-weight: 700; }
+.lawReadTocLevel3 { padding-left: 2.4em; font-size: 13px; }
+.lawReadTocLevel4 { padding-left: 3.6em; font-size: 13px; color: var(--text-secondary); }
+.lawReadTocLevel5 { padding-left: 4.8em; font-size: 12px; color: var(--text-secondary); }
+.lawReadCrumbs { font-weight: 700; font-size: 13px; color: var(--text-secondary); margin: 6px 0; }
+.lawReadHeading { font-weight: 800; margin: 14px 0 6px; }
+.lawReadHeadingLevel3, .lawReadHeadingLevel4, .lawReadHeadingLevel5 { font-size: 13px; color: var(--text-secondary); }
+.lawReadArticle {
+  background: var(--card-bg); border: 1px solid var(--border, #dbe4f0); border-radius: 10px;
+  padding: 8px 12px; margin-bottom: 8px; scroll-margin-top: 80px;
+}
+.lawReadArticleHit { border-color: #0057e7; box-shadow: 0 0 0 2px rgba(0, 87, 231, 0.18); }
+.lawReadNav { display: flex; gap: 8px; justify-content: space-between; margin: 8px 0; }
+.lawReadNav .stackBtn[disabled] { opacity: 0.4; cursor: default; }
+.lawReadSearchHit { cursor: pointer; }
+/* 条文カードの抜粋・枠は、ダーク表示でも読めるようテーマの色に合わせる */
+.lawStockSnippet { color: var(--text-secondary); }
+.lawStockCard { border-color: var(--border, #dbe4f0); }
+.lawReadArea mark, .lawStockSnippet mark { background: rgba(255, 213, 79, 0.55); color: inherit; border-radius: 2px; }
+/* ▲▲▲ 全条ダウンロード・全条を読む ここまで ▲▲▲ */

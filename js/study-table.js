@@ -976,9 +976,11 @@ function attachTableClickHandler(wrapEl) {
     }
     const bodyArea = e.target.closest('.bodyCellArea');
     if (bodyArea) {
-      e.stopPropagation();
-      // 条文リンクのタップは本文の展開切替にしない（条文表示を優先する）
+      // 条文リンクのタップは本文の展開切替にしない（条文表示を優先する）。
+      // 条文の表示は document 側の委任リスナー（js/lawref.js）が受け持つため、
+      // stopPropagation より前に抜けて、クリックをそこまで届かせる
       if (e.target.closest('.lawRef')) return;
+      e.stopPropagation();
       const idx = Number(bodyArea.dataset.idx);
       const ent = entries[idx];
       const wasCollapsed = !!(ent && !expandedBodySet.has(ent.title));

@@ -279,9 +279,10 @@ function renderQuizPage() {
   quizArea.innerHTML = html;
   const blankSpans = quizArea.querySelectorAll('.quizBlank');
   blankSpans.forEach(span => span.addEventListener('click', (evt) => {
-    evt.stopPropagation();
-    // 空欄内の条文リンクのタップは条文表示を優先し、空欄の開閉はしない
+    // 空欄内の条文リンクのタップは条文表示を優先し、空欄の開閉はしない。
+    // 条文の表示は document 側の委任リスナー（js/lawref.js）なので、stopPropagation より前に抜ける
     if (evt.target.closest('.lawRef')) return;
+    evt.stopPropagation();
     span.classList.toggle('revealed');
   }));
   const blankRevealAllBtn = document.getElementById('quizBlankRevealAllBtn');
