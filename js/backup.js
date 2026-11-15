@@ -23,6 +23,85 @@ function buildBackupPayload() {
     : { entries: entries, studyLog: studyLog, manualLog: manualLog };
   return Object.assign({ exportedAt: new Date().toISOString() }, snap);
 }
+// 端末への保存に共有シート（Web Share API）を使うかどうか。
+// iPhone・iPad（ホーム画面のPWAを含む）では<a download>が効かずJSONが画面に
+// 表示されるだけなので共有シートを使う。それ以外（Windows・Mac・Androidの
+// Chromeなど）は<a download>で普通にダウンロードする。
+// v31.0まではWindowsのChromeでも共有シートを使おうとしていたが、先にGoogle Drive
+// へアップロードしている間に「ボタンを押した直後」の扱いが切れて共有が拒否され
+// （NotAllowedError）、「端末への保存はできませんでした」になっていた
+function backupPrefersShareSheet(nav) {
+  if (!nav || typeof nav.share !== 'function' || typeof nav.canShare !== 'function') return false;
+  const ua = String(nav.userAgent || '');
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  // iPadOS 13以降のSafariはMacと同じUAを名乗るため、タッチ対応かどうかで見分ける
+  return /Macintosh/.test(ua) && Number(nav.maxTouchPoints) > 1;
+}
+// バックアップのJSONを端末に保存する。戻り値は 'saved'（保存した／保存を始めた）・
+// 'cancelled'（共有シートを閉じた）・'failed'（保存できなかった）
+async function saveBackupFileLocally(json, fileName) {
+  try {
+    if (backupPrefersShareSheet(navigator)) {
+      const file = new File([json], fileName, { type: 'application/json' });
+      if (navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: fileName });
+          return 'saved';
+        } catch (shareErr) {
+          if (shareErr && shareErr.name === 'AbortError') return 'cancelled';
+          // 時間が経って共有が拒否された（NotAllowedError）などの場合は、
+          // <a download>に切り替えるとiOSでは画面がJSONに遷移してしまうため、
+          // 「端末に保存」ボタンでもう一度押してもらう
+          return 'failed';
+        }
+      }
+    }
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return 'saved';
+  } catch (err) {
+    return 'failed';
+  }
+}
+// 端末への保存ができなかったときに、もう一度押して保存し直せるボタンを出す
+// （押した直後なら共有シートも拒否されない）
+let pendingBackupFile = null;
+function showBackupStatus(message, retryFile) {
+  pendingBackupFile = retryFile || null;
+  status.textContent = message;
+  if (pendingBackupFile) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'backupSaveLocalRetryBtn';
+    btn.textContent = '📥 端末に保存する';
+    btn.style.marginLeft = '8px';
+    status.appendChild(btn);
+  }
+}
+status.addEventListener('click', async (e) => {
+  if (!e.target || typeof e.target.closest !== 'function' || !e.target.closest('#backupSaveLocalRetryBtn')) return;
+  const file = pendingBackupFile;
+  if (!file) return;
+  const result = await saveBackupFileLocally(file.json, file.fileName);
+  if (result === 'saved') {
+    localStorage.setItem(BACKUP_LAST_AT_KEY, todayStr());
+    localStorage.removeItem(BACKUP_SNOOZE_AT_KEY);
+    renderBackupLastInfo();
+    renderBackupReminderBanner();
+    showBackupStatus('📦 バックアップを端末に保存しました。');
+  } else if (result === 'cancelled') {
+    showBackupStatus('端末への保存はキャンセルされました。', file);
+  } else {
+    showBackupStatus('端末に保存できませんでした。もう一度お試しください。', file);
+  }
+});
 async function downloadFullBackup() {
   const payload = buildBackupPayload();
   const fileName = '論証集バックアップ_' + todayStr() + '.json';
@@ -41,58 +120,25 @@ async function downloadFullBackup() {
       driveError = err.message;
     }
   }
-  // 端末への保存は、共有シートが使える環境（iPadのPWAなど）ではWeb Share APIを
-  // 使う。<a download>はiOSのPWAで無視されてJSONが画面表示されるだけなので、
-  // 使える場合は共有シートを優先する
-  let localSaved = false;
-  let shareCancelled = false;
-  try {
-    const file = new File([json], fileName, { type: 'application/json' });
-    let shared = false;
-    try {
-      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function'
-        && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: fileName });
-        shared = true;
-      }
-    } catch (shareErr) {
-      if (shareErr && shareErr.name === 'AbortError') {
-        shareCancelled = true;
-      } else {
-        throw shareErr;
-      }
-    }
-    if (!shared && !shareCancelled) {
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    }
-    localSaved = shared || (!shared && !shareCancelled);
-  } catch (err) {
-    localSaved = false;
-  }
+  const localResult = await saveBackupFileLocally(json, fileName);
+  const localSaved = localResult === 'saved';
   if (localSaved || driveUploaded) {
     localStorage.setItem(BACKUP_LAST_AT_KEY, todayStr());
     localStorage.removeItem(BACKUP_SNOOZE_AT_KEY);
   }
   renderBackupLastInfo();
   renderBackupReminderBanner();
+  const retryFile = localSaved ? null : { json: json, fileName: fileName };
   if (localSaved && driveUploaded) {
-    status.textContent = '📦 バックアップを保存し、Google Driveにもアップロードしました。';
+    showBackupStatus('📦 バックアップを保存し、Google Driveにもアップロードしました。');
   } else if (driveUploaded) {
-    status.textContent = shareCancelled
+    showBackupStatus(localResult === 'cancelled'
       ? '📦 Google Driveにアップロードしました（端末への保存はキャンセルされました）。'
-      : '📦 Google Driveにアップロードしました（端末への保存はできませんでした）。';
+      : '📦 Google Driveにアップロードしました（端末への保存はできませんでした）。', retryFile);
   } else if (localSaved) {
-    status.textContent = '📦 バックアップを端末に保存しました（Google Driveへのアップロードは失敗：' + driveError + '）。';
+    showBackupStatus('📦 バックアップを端末に保存しました（Google Driveへのアップロードは失敗：' + driveError + '）。');
   } else {
-    status.textContent = 'バックアップに失敗しました（Google Driveへのアップロードは失敗：' + driveError + '）。通信状況を確認してもう一度お試しください。';
+    showBackupStatus('バックアップに失敗しました（Google Driveへのアップロードは失敗：' + driveError + '）。通信状況を確認してもう一度お試しください。', retryFile);
   }
 }
 function daysSince(dateStr) {
