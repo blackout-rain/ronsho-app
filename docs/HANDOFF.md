@@ -1,11 +1,19 @@
 # 引き継ぎメモ
 
-最終更新：2026-11-13（v31.0・実機確認済み）
+最終更新：2026-11-15（v31.1）
 
 ## いまの版
 
-- **v31.0**（`index.html` の `<title>`・`<h1>`、`sw.js` の `CACHE_NAME = ronsho-app-cache-v228`）
+- **v31.1**（`index.html` の `<title>`・`<h1>`、`sw.js` の `CACHE_NAME = ronsho-app-cache-v229`）
 - 公開URL：https://blackout-rain.github.io/ronsho-app/ （main へのマージで GitHub Pages に自動デプロイ）
+
+## v31.1 でやったこと
+
+- 不具合修正：パソコン（WindowsのChrome）で「📦 今すぐバックアップ」を押すと「Google Driveにアップロードしました（端末への保存はできませんでした）」になり、端末にファイルが保存されなかった。
+  - 原因：v27.1から、共有シート（Web Share API）が使える環境では共有シートで保存していた。WindowsのChromeも共有シートに対応しているため使おうとしたが、先にGoogle Driveへアップロードしている数秒の間に「ボタンを押した直後」の扱いが切れ、共有が拒否されていた（NotAllowedError）。
+  - 直し方：共有シートは iPhone・iPad だけで使い（`backupPrefersShareSheet`）、それ以外は普通のダウンロード（`<a download>`）にした。iPhone・iPadで同じように拒否されたときは、状態表示に「📥 端末に保存する」ボタンを出し、押し直せば保存できるようにした。
+  - テスト：`tools/unit-test/run.js` に「バックアップ：端末への保存」のチェックを追加。
+- 実機確認：未（ユーザーにパソコンでの確認を依頼中）。
 
 ## v31.0 でやったこと
 

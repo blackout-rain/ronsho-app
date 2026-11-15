@@ -373,6 +373,23 @@ console.log('\n■ localStorageキーの同期登録漏れ');
     fields.filter(f => !NOT_APPLIED.includes(f) && !has(new RegExp('data\\.' + f + '\\b|^\\s*' + f + ": 'ronsho", 'm'), backupCode)), []);
 }
 
+console.log('\n■ バックアップ：端末への保存のしかた');
+{
+  const bk = loadApp(['js/core.js', 'js/backup.js']);
+  const prefers = bk('backupPrefersShareSheet');
+  const share = { share: () => {}, canShare: () => true };
+  const WIN_CHROME = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
+  const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+  const MAC_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
+  const ANDROID = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36';
+  eq('WindowsのChromeは共有シートを使わない（v31.0までの不具合）', prefers(Object.assign({ userAgent: WIN_CHROME, maxTouchPoints: 0 }, share)), false);
+  eq('Androidも普通のダウンロード', prefers(Object.assign({ userAgent: ANDROID, maxTouchPoints: 5 }, share)), false);
+  eq('Macは普通のダウンロード', prefers(Object.assign({ userAgent: MAC_UA, maxTouchPoints: 0 }, share)), false);
+  eq('iPhoneは共有シート', prefers(Object.assign({ userAgent: IPHONE, maxTouchPoints: 5 }, share)), true);
+  eq('iPad（Macと同じUA・タッチ対応）は共有シート', prefers(Object.assign({ userAgent: MAC_UA, maxTouchPoints: 5 }, share)), true);
+  eq('共有に対応していないiPhoneは普通のダウンロード', prefers({ userAgent: IPHONE, maxTouchPoints: 5 }), false);
+}
+
 console.log('\n■ オフライン動作（外部スクリプトに頼らない）');
 {
   const html = read('index.html');
@@ -388,9 +405,37 @@ console.log('\n■ オフライン動作（外部スクリプトに頼らない�
     [...precache].filter(p => p && !fs.existsSync(path.join(ROOT, p))), []);
 }
 
-console.log('');
-if (failures > 0) {
-  console.log('❌ ' + failures + '件のチェックが失敗しました');
-  process.exit(1);
+async function runAsyncChecks() {
+  console.log('\n■ バックアップ：端末への保存の結果');
+  const bk = loadApp(['js/core.js', 'js/backup.js']);
+  const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+  bk('File = function () {}; Blob = function () {}; URL = { createObjectURL: () => { globalThis.__downloads = (globalThis.__downloads || 0) + 1; return "blob:x"; }, revokeObjectURL: () => {} };');
+  const save = bk('saveBackupFileLocally');
+  const downloads = () => bk('globalThis.__downloads || 0');
+  let shared = 0;
+  // Windows：共有シートが使えても、普通のダウンロードで保存する
+  bk('navigator.userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/142.0.0.0"; navigator.maxTouchPoints = 0;');
+  bk('navigator').share = () => { shared++; return Promise.reject(Object.assign(new Error('x'), { name: 'NotAllowedError' })); };
+  bk('navigator').canShare = () => true;
+  eq('Windowsでは保存できる', await save('{}', 'a.json'), 'saved');
+  eq('Windowsでは共有シートを呼ばない', shared, 0);
+  eq('Windowsではダウンロードを始める', downloads(), 1);
+  // iPhone：共有シート
+  bk('navigator.userAgent = ' + JSON.stringify(IPHONE) + '; navigator.maxTouchPoints = 5;');
+  bk('navigator').share = () => { shared++; return Promise.resolve(); };
+  eq('iPhoneで共有できたら保存', await save('{}', 'a.json'), 'saved');
+  bk('navigator').share = () => Promise.reject(Object.assign(new Error('x'), { name: 'AbortError' }));
+  eq('iPhoneで共有シートを閉じたらキャンセル', await save('{}', 'a.json'), 'cancelled');
+  bk('navigator').share = () => Promise.reject(Object.assign(new Error('x'), { name: 'NotAllowedError' }));
+  eq('iPhoneで共有が拒否されたら失敗（再試行ボタンを出す）', await save('{}', 'a.json'), 'failed');
+  eq('iPhoneでは画面が遷移するダウンロードに切り替えない', downloads(), 1);
 }
-console.log('🎉 全チェック合格');
+
+runAsyncChecks().catch(e => check('非同期のチェックを実行できる', false, e && e.stack)).then(() => {
+  console.log('');
+  if (failures > 0) {
+    console.log('❌ ' + failures + '件のチェックが失敗しました');
+    process.exit(1);
+  }
+  console.log('🎉 全チェック合格');
+});
