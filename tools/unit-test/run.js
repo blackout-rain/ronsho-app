@@ -341,6 +341,7 @@ console.log('\n■ localStorageキーの同期登録漏れ');
     ronshoLawCacheV1: 'e-Govから取得した条文のキャッシュ（再取得できる）',
     ronshoLawFullDB: '全条ダウンロードの保存先（IndexedDBの名前。約10MBあり、各端末で再ダウンロードできる）',
     ronshoPastMatrixEraV1: '過去問マトリクスの令和/平成の表示切替（見た目だけ）',
+    ronshoSpeechVoiceV1: '読み上げの声（端末に入っている声の一覧が端末ごとに違い、他の端末では同じ声が無いことが多い）',
     ronshoXpMigratedFromLegacyV1: 'XPの移行処理済みフラグ（端末ごとの内部管理）',
     ronshoXpPastExamMigratedV1: 'XPの移行処理済みフラグ（端末ごとの内部管理）'
   };
@@ -388,6 +389,64 @@ console.log('\n■ バックアップ：端末への保存のしかた');
   eq('iPhoneは共有シート', prefers(Object.assign({ userAgent: IPHONE, maxTouchPoints: 5 }, share)), true);
   eq('iPad（Macと同じUA・タッチ対応）は共有シート', prefers(Object.assign({ userAgent: MAC_UA, maxTouchPoints: 5 }, share)), true);
   eq('共有に対応していないiPhoneは普通のダウンロード', prefers({ userAgent: IPHONE, maxTouchPoints: 5 }), false);
+}
+
+console.log('\n■ 読み上げ：声の選択・画面オフ対策');
+{
+  const sp = loadApp(['js/core.js', 'js/speech.js']);
+  const IPAD = { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15', maxTouchPoints: 5 };
+  const IPHONE = { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1', maxTouchPoints: 5 };
+  const MAC = { userAgent: IPAD.userAgent, maxTouchPoints: 0 };
+  const WIN = { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', maxTouchPoints: 0 };
+  const needs = sp('speechNeedsKeepAlive');
+  eq('iPad（Macと同じUA＋タッチ）では一時停止→再開の延命をしない', needs(IPAD), false);
+  eq('iPhoneでも延命をしない', needs(IPHONE), false);
+  eq('MacのSafariは今までどおり', needs(MAC), true);
+  eq('パソコンのChromeは今までどおり延命する（約15秒で止まる不具合への対策）', needs(WIN), true);
+
+  const voices = [
+    { name: 'Kyoko', lang: 'ja-JP', voiceURI: 'com.apple.voice.compact.ja-JP.Kyoko', default: false },
+    { name: 'O-Ren', lang: 'ja_JP', voiceURI: 'com.apple.voice.enhanced.ja-JP.O-ren', default: true },
+    { name: 'Samantha', lang: 'en-US', voiceURI: 'com.apple.voice.compact.en-US.Samantha', default: false }
+  ];
+  eq('日本語の声だけを選択肢にする（ja-JP・ja_JP）', sp('speechJapaneseVoices')(voices).map(v => v.name), ['Kyoko', 'O-Ren']);
+  const find = sp('findSpeechVoice');
+  eq('保存した声をvoiceURIで見つける', (find(voices, 'com.apple.voice.compact.ja-JP.Kyoko') || {}).name, 'Kyoko');
+  eq('名前でも見つける', (find(voices, 'O-Ren') || {}).name, 'O-Ren');
+  eq('日本語以外の声は選ばない', find(voices, 'Samantha'), null);
+  eq('おまかせ（空）なら声を決めない', find(voices, ''), null);
+
+  sp('speechSynthesis').getVoices = () => voices;
+  sp("saveSpeechVoiceUri('com.apple.voice.compact.ja-JP.Kyoko')");
+  const u1 = {};
+  sp('applySpeechVoice')(u1);
+  eq('選んだ声を読み上げに当てる', [u1.voice && u1.voice.name, u1.lang], ['Kyoko', 'ja-JP']);
+  sp("saveSpeechVoiceUri('com.apple.voice.removed')");
+  const u2 = {};
+  sp('applySpeechVoice')(u2);
+  eq('選んだ声が端末から無くなっていたら標準の日本語の声で読む', [u2.voice, u2.lang], [undefined, 'ja-JP']);
+  eq('無くなった声でも選択は消さない（声が戻れば使える）', sp('loadSpeechVoiceUri()'), 'com.apple.voice.removed');
+  sp("saveSpeechVoiceUri('')");
+  eq('おまかせに戻すと保存を消す', sp("localStorage.getItem('ronshoSpeechVoiceV1')"), null);
+
+  // 画面を点け直したときの「止まっているか」の判定
+  const stalled = sp('speechLooksStalled');
+  sp('speechIsPlaying = true; speechGapTimer = null;');
+  eq('読み上げ中なのに何も話していなければ止まっている', stalled({ speaking: false, pending: false, paused: false }), true);
+  eq('一時停止状態のまま固まっていても止まっている', stalled({ speaking: true, pending: false, paused: true }), true);
+  eq('話している最中なら止まっていない', stalled({ speaking: true, pending: false, paused: false }), false);
+  eq('順番待ちがあれば止まっていない', stalled({ speaking: false, pending: true, paused: false }), false);
+  sp('speechGapTimer = 5;');
+  eq('タイトルと本文の間（ま）を置いている最中は止まっていない', stalled({ speaking: false, pending: false, paused: false }), false);
+  sp('speechIsPlaying = false; speechGapTimer = null;');
+  eq('一時停止・停止した後は読み直さない', stalled({ speaking: false, pending: false, paused: true }), false);
+
+  // 間（ま）の待ち時間が終わったら「待っている最中」の印を消す
+  sp('setTimeout = (fn) => { globalThis.__gapFn = fn; return 9; }; clearTimeout = () => {}; globalThis.__ran = 0;');
+  sp('scheduleSpeechGap(() => { globalThis.__ran++; }, 700)');
+  eq('間を置いている間は印が付く', sp('speechGapTimer'), 9);
+  sp('globalThis.__gapFn()');
+  eq('待ち終わったら印を消して次を読む', [sp('speechGapTimer'), sp('globalThis.__ran')], [null, 1]);
 }
 
 console.log('\n■ オフライン動作（外部スクリプトに頼らない）');
