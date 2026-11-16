@@ -598,6 +598,7 @@ document.querySelectorAll('.tabBtn').forEach(btn => {
     if (btn.dataset.page === 'settingsPage') settingsPageRenderers.forEach(fn => fn());
     if (btn.dataset.page === 'speechPage') {
       renderSpeechSubjectSelect();
+      if (typeof renderSpeechVoiceSelect === 'function') renderSpeechVoiceSelect();
       speechQueue = buildSpeechQueue();
       speechIndex = 0;
       renderSpeechCurrentCard();
