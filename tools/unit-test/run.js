@@ -447,6 +447,38 @@ console.log('\n■ 読み上げ：声の選択・画面オフ対策');
   eq('間を置いている間は印が付く', sp('speechGapTimer'), 9);
   sp('globalThis.__gapFn()');
   eq('待ち終わったら印を消して次を読む', [sp('speechGapTimer'), sp('globalThis.__ran')], [null, 1]);
+
+  // 読み上げ中だけ、音の種類を「再生（playback）」にする（iPadOS 17以降）
+  sp('navigator.audioSession = { type: "auto" };');
+  sp('document.getElementById("speechBackgroundChk").checked = false; startSpeechBackgroundAudio();');
+  eq('「画面オフでも続ける」を外していれば音の種類は変えない', sp('navigator.audioSession.type'), 'auto');
+  sp('document.getElementById("speechBackgroundChk").checked = true;');
+  sp('startSpeechBackgroundAudio()');
+  eq('読み上げを始めると音の種類を「再生」にする', sp('navigator.audioSession.type'), 'playback');
+  sp('stopSpeechBackgroundAudio()');
+  eq('止めたら標準（auto）に戻す（ほかのアプリの音楽を止めっぱなしにしない）', sp('navigator.audioSession.type'), 'auto');
+  sp('delete navigator.audioSession;');
+  sp('startSpeechBackgroundAudio(); stopSpeechBackgroundAudio();');
+  check('audioSession が無い端末でもエラーにならない', true);
+
+  // 見張り役：止まっていたら再開・読み直し（1つの論証につき2回まで）
+  sp('globalThis.__speak = 0; speakCurrentEntry = () => { globalThis.__speak++; };');
+  sp('globalThis.__synth = { speaking: false, pending: false, paused: false, resumed: 0, resume() { this.resumed++; } }; speechSynthesis = globalThis.__synth;');
+  sp('speechIsPlaying = true; speechGapTimer = null; speechStallRetries = 0;');
+  sp('speechWatchdogTick()');
+  eq('止まっていたら今の論証を読み直す', sp('globalThis.__speak'), 1);
+  sp('speechWatchdogTick(); speechWatchdogTick(); speechWatchdogTick();');
+  eq('読み直しは1つの論証につき2回まで（冒頭を何度も繰り返さない）', sp('globalThis.__speak'), 2);
+  sp('__synth.paused = true; speechWatchdogTick();');
+  eq('一時停止状態で固まっていたら再開する', [sp('__synth.resumed'), sp('globalThis.__speak')], [1, 2]);
+  sp('__synth.paused = false; __synth.speaking = true; speechWatchdogTick();');
+  eq('話している最中は何もしない', [sp('__synth.resumed'), sp('globalThis.__speak')], [1, 2]);
+  sp('__synth.speaking = false; speechGapTimer = 5; speechWatchdogTick(); speechGapTimer = null;');
+  eq('間（ま）を置いている最中は何もしない', sp('globalThis.__speak'), 2);
+  sp('document.getElementById = () => ({ value: "none" }); speechQueue = [{}, {}]; speechIndex = 0; advanceSpeechAfterEntry(); speechGapTimer = null;');
+  eq('論証を最後まで読んだら読み直しの回数を戻す', sp('speechStallRetries'), 0);
+  sp('speechIsPlaying = false; speechWatchdogTick();');
+  eq('停止・一時停止の後は読み直さない', sp('globalThis.__speak'), 2);
 }
 
 console.log('\n■ オフライン動作（外部スクリプトに頼らない）');

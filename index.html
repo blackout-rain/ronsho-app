@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>論証集アプリ v31.2（読み上げの声を選べるようにし、iPadで画面オフ中に止まりにくく修正）</title>
+<title>論証集アプリ v31.3（ホーム画面アプリで画面オフ中も読み上げを続けられるよう対策）</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0057e7">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@ try {
 <script src="vendor/jszip/jszip.min.js"></script><link rel="stylesheet" href="style.css">
 </head>
 <body>
-<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v31.2</span></h1>
+<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v31.3</span></h1>
 <div id="status"></div>
 <div id="syncConflictBanner" class="syncConflictBanner"></div>
 <div id="backupReminderBanner" class="backupReminderBanner"></div>
@@ -115,7 +115,7 @@ try {
 <option value="0">なし</option>
 </select>
 <label><input type="checkbox" id="speechIncludeMemorizedChk"> 暗記済みも含める</label>
-<label title="読み上げ中に無音の音声を流して、画面を消しても読み上げが止まりにくくします"><input type="checkbox" id="speechBackgroundChk" checked> 画面オフでも続ける</label>
+<label title="読み上げ中は音楽アプリと同じ扱いにして無音の音声を流し、画面を消しても読み上げが止まりにくくします（この間、ほかのアプリの音楽は止まります）"><input type="checkbox" id="speechBackgroundChk" checked> 画面オフでも続ける</label>
 <label for="speechVoiceSelect">声：</label>
 <select id="speechVoiceSelect"><option value="">おまかせ（端末の標準の声）</option></select>
 <button type="button" id="speechVoiceTestBtn" title="選んだ声で短い文を読みます">🔈 試し聞き</button>
