@@ -82,8 +82,28 @@ function speechNeedsKeepAlive(nav) {
   return !speechIsAppleMobile(nav);
 }
 let speechKeepAliveTimer = null;
+// 見張り役：読み上げ中なのに止まっていたら（画面オフで端末に止められた等）、
+// 一時停止状態なら再開し、何も話していなければ今の論証を頭から読み直す。
+// 読み直しは1つの論証につき2回まで（端末が止め続ける場合に、同じ論証の
+// 冒頭を何度も繰り返さないため）。論証を最後まで読むと回数を戻す
+const SPEECH_WATCHDOG_MS = 3000;
+const SPEECH_MAX_STALL_RETRIES = 2;
+let speechWatchdogTimer = null;
+let speechStallRetries = 0;
+function speechWatchdogTick() {
+  const synth = window.speechSynthesis;
+  if (!speechLooksStalled(synth)) return;
+  if (synth.paused) {
+    try { synth.resume(); } catch (e) {}
+    return;
+  }
+  if (speechStallRetries >= SPEECH_MAX_STALL_RETRIES) return;
+  speechStallRetries++;
+  speakCurrentEntry();
+}
 function startSpeechKeepAlive() {
   stopSpeechKeepAlive();
+  speechWatchdogTimer = setInterval(speechWatchdogTick, SPEECH_WATCHDOG_MS);
   if (!speechNeedsKeepAlive(typeof navigator !== 'undefined' ? navigator : null)) return;
   speechKeepAliveTimer = setInterval(() => {
     if (!speechIsPlaying) return;
@@ -97,6 +117,10 @@ function stopSpeechKeepAlive() {
   if (speechKeepAliveTimer) {
     clearInterval(speechKeepAliveTimer);
     speechKeepAliveTimer = null;
+  }
+  if (speechWatchdogTimer) {
+    clearInterval(speechWatchdogTimer);
+    speechWatchdogTimer = null;
   }
 }
 
@@ -266,8 +290,18 @@ function speechBackgroundEnabled() {
   const chk = document.getElementById('speechBackgroundChk');
   return !chk || chk.checked;
 }
+// iPadOS・iOS 17以降のSafariは、ページの音の種類を指定できる（navigator.audioSession）。
+// 標準（auto）のままだと、ホーム画面に追加したアプリでは画面を消すと音が止められる
+// ことがあるため、読み上げ中だけ「再生（playback）」＝音楽アプリと同じ扱いにする。
+// この間は、ほかのアプリの音楽は止まる。読み上げを止めたら標準に戻す
+function setSpeechAudioSession(type) {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.audioSession) navigator.audioSession.type = type;
+  } catch (e) {}
+}
 function startSpeechBackgroundAudio() {
   if (!speechBackgroundEnabled()) return;
+  setSpeechAudioSession('playback');
   try {
     if (!speechSilentAudio) {
       speechSilentAudio = new Audio(buildSilentWavUrl());
@@ -281,6 +315,7 @@ function startSpeechBackgroundAudio() {
 }
 function stopSpeechBackgroundAudio() {
   if (speechSilentAudio) speechSilentAudio.pause();
+  setSpeechAudioSession('auto');
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
 }
 let speechMediaSessionReady = false;
@@ -422,6 +457,7 @@ function speechLooksStalled(synth) {
 function recoverStalledSpeech() {
   if (!speechLooksStalled(window.speechSynthesis)) return;
   if (speechQueue.length === 0) return;
+  speechStallRetries = 0;
   startSpeechBackgroundAudio();
   speakCurrentEntry();
 }
@@ -608,6 +644,7 @@ function renderSpeechCurrentCard() {
 }
 function advanceSpeechAfterEntry() {
   if (!speechIsPlaying) return;
+  speechStallRetries = 0;
   const loopSel = document.getElementById('speechLoopSelect');
   const loopMode = loopSel ? loopSel.value : 'none';
   if (loopMode === 'one') {
@@ -681,6 +718,7 @@ function startSpeech() {
   }
   acquireSpeechWakeLock();
   startSpeechBackgroundAudio();
+  speechStallRetries = 0;
   if (window.speechSynthesis.paused && speechQueue.length > 0) {
     window.speechSynthesis.resume();
     speechIsPlaying = true;
