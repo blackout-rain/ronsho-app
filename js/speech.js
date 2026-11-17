@@ -432,14 +432,33 @@ function renderSpeechVoiceSelect() {
 })();
 // ▲ 声の選択 ここまで
 let speechWakeLock = null;
-async function acquireSpeechWakeLock() {
-  if (!('wakeLock' in navigator)) return;
-  try {
-    speechWakeLock = await navigator.wakeLock.request('screen');
-    speechWakeLock.addEventListener('release', () => { speechWakeLock = null; });
-  } catch (e) {
-    speechWakeLock = null;
+// 読み上げ中は画面が自動で消えないようにする（画面が消えるとiPadでは読み上げが
+// 止まるため）。取得中に重ねて呼ばれても二重に取らないよう、取得中の約束を使い回す。
+// 戻り値の約束は、取れたら true・取れなかったら false になる
+let speechWakeLockPromise = null;
+function acquireSpeechWakeLock() {
+  if (typeof navigator === 'undefined' || !('wakeLock' in navigator)) return Promise.resolve(false);
+  if (speechWakeLock) return Promise.resolve(true);
+  if (!speechWakeLockPromise) {
+    let p;
+    try { p = Promise.resolve(navigator.wakeLock.request('screen')); } catch (e) { p = Promise.reject(e); }
+    speechWakeLockPromise = p.then(lock => {
+      speechWakeLockPromise = null;
+      if (!speechIsPlaying && !speechDarkOpen) {
+        // 取得を待つ間に読み上げが止められていたら、すぐ手放す
+        try { lock.release().catch(() => {}); } catch (e) {}
+        return false;
+      }
+      speechWakeLock = lock;
+      lock.addEventListener('release', () => { if (speechWakeLock === lock) speechWakeLock = null; });
+      return true;
+    }, () => {
+      speechWakeLockPromise = null;
+      speechWakeLock = null;
+      return false;
+    });
   }
+  return speechWakeLockPromise;
 }
 function releaseSpeechWakeLock() {
   if (speechWakeLock) {
@@ -447,6 +466,65 @@ function releaseSpeechWakeLock() {
     speechWakeLock = null;
   }
 }
+// ▼ 画面を真っ黒にするモード：iPadでは画面を消すと（SafariでもiPadの仕組み上）
+// 読み上げが止められるため、画面は点けたまま全体を真っ黒にして画面オフの代わりにする。
+// うっかり触って戻らないよう、2回タップ（3秒以内）で戻る
+const SPEECH_DARK_DOUBLE_TAP_MS = 3000;
+let speechDarkOpen = false;
+let speechDarkLastTapAt = 0;
+let speechDarkHintTimer = null;
+function speechDarkTapAction(now, lastTapAt) {
+  return lastTapAt > 0 && now - lastTapAt <= SPEECH_DARK_DOUBLE_TAP_MS ? 'close' : 'hint';
+}
+function showSpeechDarkHint(text, ms) {
+  const hint = document.getElementById('speechDarkHint');
+  if (!hint) return;
+  hint.textContent = text;
+  hint.style.opacity = '1';
+  if (speechDarkHintTimer) clearTimeout(speechDarkHintTimer);
+  speechDarkHintTimer = setTimeout(() => { hint.style.opacity = '0'; }, ms);
+}
+function openSpeechDarkScreen() {
+  const ov = document.getElementById('speechDarkOverlay');
+  if (!ov) return;
+  speechDarkOpen = true;
+  speechDarkLastTapAt = 0;
+  ov.classList.add('show');
+  document.documentElement.classList.add('speechDarkActive');
+  if (!speechIsPlaying) startSpeech();
+  acquireSpeechWakeLock().then(ok => {
+    if (!speechDarkOpen) return;
+    if (ok) {
+      showSpeechDarkHint('🌑 画面を暗くしました。読み上げは続きます。\n2回タップで戻ります', 5000);
+    } else {
+      showSpeechDarkHint('⚠ 画面が自動で消えるのを止められませんでした。\niPadの「設定 → 画面表示と明るさ → 自動ロック」を「なし」にしてください。\n2回タップで戻ります', 12000);
+    }
+  });
+}
+function closeSpeechDarkScreen() {
+  const ov = document.getElementById('speechDarkOverlay');
+  speechDarkOpen = false;
+  speechDarkLastTapAt = 0;
+  if (ov) ov.classList.remove('show');
+  document.documentElement.classList.remove('speechDarkActive');
+  if (!speechIsPlaying) releaseSpeechWakeLock();
+}
+(() => {
+  const ov = document.getElementById('speechDarkOverlay');
+  const btn = document.getElementById('speechDarkBtn');
+  if (!ov || !btn) return;
+  btn.addEventListener('click', openSpeechDarkScreen);
+  ov.addEventListener('click', () => {
+    const now = Date.now();
+    if (speechDarkTapAction(now, speechDarkLastTapAt) === 'close') {
+      closeSpeechDarkScreen();
+      return;
+    }
+    speechDarkLastTapAt = now;
+    showSpeechDarkHint('もう一度タップすると戻ります', SPEECH_DARK_DOUBLE_TAP_MS);
+  });
+})();
+// ▲ 画面を真っ黒にするモード ここまで
 // 画面を消している間に端末が読み上げを止めてしまった場合、画面を点け直した
 // ときに、読んでいた論証の頭から読み直す（読み上げ中のまま無音で固まらないように）
 function speechLooksStalled(synth) {

@@ -1488,6 +1488,24 @@ input[type=file] { display:none; }
 }
 .speechButtonRow button:hover { background: var(--tint-1); }
 #speechPlayBtn { background: linear-gradient(135deg, #0057e7, #00c2ff); color: #fff; border: none; }
+/* 画面を真っ黒にするモード（読み上げは続けたまま、画面オフの代わりにする） */
+.speechDarkOverlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 20000;
+  background: #000;
+  align-items: center; justify-content: center;
+  touch-action: manipulation; /* 2回タップで拡大されないように */
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: none;
+}
+.speechDarkOverlay.show { display: flex; }
+html.speechDarkActive, html.speechDarkActive body { overflow: hidden; } /* 真っ黒の間は後ろの画面をスクロールさせず、スクロールバーも出さない */
+html.speechDarkActive { scrollbar-gutter: auto; } /* パソコンでスクロールバー分の隙間が明るく残らないように */
+.speechDarkHint {
+  color: #666; font-size: 14px; line-height: 1.8; text-align: center; white-space: pre-line;
+  padding: 0 24px; opacity: 0; transition: opacity 0.6s;
+}
 .speechCurrentCard {
   background: var(--card-bg);
   border-radius: 20px;
