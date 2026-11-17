@@ -1,11 +1,23 @@
 # 引き継ぎメモ
 
-最終更新：2026-11-16（v31.3・実機未確認）
+最終更新：2026-11-17（v31.4・実機未確認）
 
 ## いまの版
 
-- **v31.3**（`index.html` の `<title>`・`<h1>`、`sw.js` の `CACHE_NAME = ronsho-app-cache-v231`）
+- **v31.4**（`index.html` の `<title>`・`<h1>`、`sw.js` の `CACHE_NAME = ronsho-app-cache-v232`）
 - 公開URL：https://blackout-rain.github.io/ronsho-app/ （main へのマージで GitHub Pages に自動デプロイ）
+
+## v31.4 でやったこと
+
+- v31.3 の実機確認（2026-11-17、iPad）：**ホーム画面アプリでもSafariでも、画面を消すと読み上げが止まる**（「画面オフでも続ける」・audioSession・見張り役は効かなかった）。iPadのブラウザの読み上げ（speechSynthesis）そのものが画面オフで止められていると判断。
+- ユーザーが選んだ進め方：**画面を真っ黒にするモード**（音声ファイル方式は今回は見送り）。
+  - 読み上げタブの「🌑 画面を暗く」：全画面を真っ黒にし（`#speechDarkOverlay`）、止まっていれば再生も始める。読み上げは今の声のまま続く。
+  - 戻るのは**3秒以内に2回タップ**（`speechDarkTapAction`）。1回目は「もう一度タップすると戻ります」を出すだけ（うっかり触って戻らないように）。`touch-action: manipulation` で2回タップの拡大を防ぐ。
+  - 画面が自動で消えるとまた止まるため、Wake Lock を取る。`acquireSpeechWakeLock` は取得中の約束を使い回して二重に取らず、取れたかを true/false で返すようにした。取れなかったら黒い画面に「設定 → 画面表示と明るさ → 自動ロック を『なし』に」と案内する。
+  - 真っ黒の間は `html.speechDarkActive` で後ろの画面のスクロールを止める（`scrollbar-gutter: stable` の隙間が明るく残らないよう auto に）。
+  - テスト：`tools/unit-test/run.js` に「画面を真っ黒にするモード」「画面が自動で消えないようにする（Wake Lock）」を追加。
+- 実機確認：まだ。iPadで「🌑 画面を暗く」→ 置いたまま読み続けるか・自動ロックで消えないか・2回タップで戻るか。
+- 今後、本当の画面オフで聞きたいと言われたら：音声ファイル方式（Google Cloud Text-to-Speech をGAS経由で呼び、論証ごとの音声をIndexedDBに保存して `<audio>` で再生）。Google Cloudの支払い情報登録・API有効化・GAS更新が必要。声はGoogleの声になる。
 
 ## v31.3 でやったこと
 

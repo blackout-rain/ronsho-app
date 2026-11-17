@@ -481,6 +481,15 @@ console.log('\n■ 読み上げ：声の選択・画面オフ対策');
   eq('停止・一時停止の後は読み直さない', sp('globalThis.__speak'), 2);
 }
 
+console.log('\n■ 読み上げ：画面を真っ黒にするモード');
+{
+  const sp = loadApp(['js/core.js', 'js/speech.js']);
+  const tap = sp('speechDarkTapAction');
+  eq('1回目のタップでは戻らず案内を出す', tap(10000, 0), 'hint');
+  eq('3秒以内にもう一度タップすると戻る', tap(12500, 10000), 'close');
+  eq('3秒を過ぎてからのタップは1回目として数える（うっかり触っても戻らない）', tap(13500, 10000), 'hint');
+}
+
 console.log('\n■ オフライン動作（外部スクリプトに頼らない）');
 {
   const html = read('index.html');
@@ -497,6 +506,24 @@ console.log('\n■ オフライン動作（外部スクリプトに頼らない�
 }
 
 async function runAsyncChecks() {
+  console.log('\n■ 読み上げ：画面が自動で消えないようにする（Wake Lock）');
+  {
+    const sp = loadApp(['js/core.js', 'js/speech.js']);
+    sp('globalThis.__req = 0; globalThis.__rel = 0; navigator.wakeLock = { request: () => { globalThis.__req++; return Promise.resolve({ release: () => { globalThis.__rel++; return Promise.resolve(); }, addEventListener: () => {} }); } };');
+    sp('speechIsPlaying = true;');
+    const both = await Promise.all([sp('acquireSpeechWakeLock()'), sp('acquireSpeechWakeLock()')]);
+    eq('取れたら true を返す', both, [true, true]);
+    eq('取得中に重ねて呼ばれても1回しか取らない', sp('globalThis.__req'), 1);
+    eq('取れた後に呼ばれても取り直さない', [await sp('acquireSpeechWakeLock()'), sp('globalThis.__req')], [true, 1]);
+    sp('releaseSpeechWakeLock(); speechIsPlaying = false; speechDarkOpen = false;');
+    const pending = sp('acquireSpeechWakeLock()');
+    eq('取得を待つ間に止められていたら、すぐ手放す', [await pending, sp('globalThis.__rel'), sp('speechWakeLock')], [false, 2, null]);
+    sp('navigator.wakeLock = { request: () => Promise.reject(new Error("NotAllowedError")) }; speechIsPlaying = true;');
+    eq('取れなかったら false を返す（真っ黒の画面に自動ロックの設定を案内する）', await sp('acquireSpeechWakeLock()'), false);
+    sp('delete navigator.wakeLock;');
+    eq('Wake Lock に対応していない端末でも false を返す', await sp('acquireSpeechWakeLock()'), false);
+  }
+
   console.log('\n■ バックアップ：端末への保存の結果');
   const bk = loadApp(['js/core.js', 'js/backup.js']);
   const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';

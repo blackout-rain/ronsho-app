@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>論証集アプリ v31.3（ホーム画面アプリで画面オフ中も読み上げを続けられるよう対策）</title>
+<title>論証集アプリ v31.4（読み上げ中に画面を真っ黒にするモードを追加）</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0057e7">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,11 +25,12 @@ try {
 <script src="vendor/jszip/jszip.min.js"></script><link rel="stylesheet" href="style.css">
 </head>
 <body>
-<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v31.3</span></h1>
+<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v31.4</span></h1>
 <div id="status"></div>
 <div id="syncConflictBanner" class="syncConflictBanner"></div>
 <div id="backupReminderBanner" class="backupReminderBanner"></div>
 <div id="quoteCard" class="quoteCard"></div>
+<div id="speechDarkOverlay" class="speechDarkOverlay" aria-label="画面を暗くしています。2回タップで戻ります"><div id="speechDarkHint" class="speechDarkHint"></div></div>
 <div class="tabs">
 <button class="tabBtn active" data-page="studyPage">🏠 ホーム</button>
 <button class="tabBtn" data-page="entryListPage">📚 論証一覧</button>
@@ -142,6 +143,7 @@ try {
 <button type="button" id="speechPauseBtn">⏸ 一時停止</button>
 <button type="button" id="speechStopBtn">⏹ 停止</button>
 <button type="button" id="speechNextBtn">⏭ 次へ</button>
+<button type="button" id="speechDarkBtn" title="読み上げを続けたまま画面を真っ黒にします（iPadは画面を消すと読み上げが止まるため、その代わりに使います。2回タップで戻ります）">🌑 画面を暗く</button>
 </div>
 <div id="speechCurrentCard" class="speechCurrentCard"></div>
 </div>
