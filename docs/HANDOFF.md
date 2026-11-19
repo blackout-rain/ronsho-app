@@ -1,11 +1,23 @@
 # 引き継ぎメモ
 
-最終更新：2026-11-17（v31.4・実機未確認）
+最終更新：2026-11-19（v31.5・実機未確認）
 
 ## いまの版
 
-- **v31.4**（`index.html` の `<title>`・`<h1>`、`sw.js` の `CACHE_NAME = ronsho-app-cache-v232`）
+- **v31.5**（`index.html` の `<title>`・`<h1>`、`sw.js` の `CACHE_NAME = ronsho-app-cache-v233`）
 - 公開URL：https://blackout-rain.github.io/ronsho-app/ （main へのマージで GitHub Pages に自動デプロイ）
+
+## v31.5 でやったこと
+
+- v31.4 の実機確認（2026-11-18、iPad mini A17 Pro）：「🌑 画面を暗く」で画面が真っ黒になることは確認済み。ユーザーの希望：**暗いときに電池を長持ちさせたい**。
+- iPad mini（A17 Pro）は**液晶**なので、黒を映しても後ろのライトは点いたまま＝真っ黒だけでは電池はあまり持たない。ウェブアプリから明るさは変えられない。示した案のうち、ユーザーが選んだのは A1・A2・B4。
+  - **A1 端まで黒く**：真っ黒の間だけ `<meta name="theme-color">` を `#000000` に（`setSpeechDarkThemeColor`、戻すと元の色）。`html.speechDarkActive` と body の背景も黒。ホーム画面アプリのステータスバー（`apple-mobile-web-app-status-bar-style="default"`）は途中で変えられないので、白く残るかもしれない（実機で要確認）。
+  - **A2 裏の仕事を止める**：真っ黒の間は ①無音の音声（「画面オフでも続ける」）を止める（`speechBackgroundEnabled` が false を返す。戻ったとき読み上げ中なら流し直す）②読み上げ画面のカードを描き直さない（`speechDarkCardStale`、戻ったとき1回描く）③クラウド同期の定期チェック（`drive-sync.js` の `isSpeechDarkActive`）を止め、戻ったら `ronsho:speechDarkClosed` の知らせで1回だけ行う。見張り役（3秒ごと）と Wake Lock は読み上げを続けるために残す。
+  - **B4 明るさの案内**：黒い画面の案内（`speechDarkHintText`）に「右上から下へなぞってコントロールセンター → 明るさをいちばん下に」を追加。iPhone・iPad以外では「明るさをいちばん下に」だけ。表示は10秒（自動ロックの警告つきは15秒）。
+  - `speechDarkOpen` の宣言は `js/speech.js` の先頭に移した（ほかの関数からも見るため）。
+  - テスト：`tools/unit-test/run.js` に「真っ黒の間は電池を使う仕事を止める」と案内の文、`tools/sync-test/run.js` に「S1 真っ黒の間は定期の取り込みをしない」を追加。
+- 実機確認：まだ。iPad miniで ①上の帯（Safariのタブバー／ホーム画面アプリのステータスバー）が黒くなるか ②明るさの案内が読めるか ③戻ったとき読み上げ画面が今の論証になっているか。
+- 今後の候補（見送り中）：A3 おやすみタイマー、B5 アクセシビリティの「低照度」フィルタ（トップボタン3回）、B6 ショートカットAppで開いたら明るさ0%。
 
 ## v31.4 でやったこと
 

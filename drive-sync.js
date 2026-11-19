@@ -1113,8 +1113,18 @@
     const root = document.getElementById('driveSyncConflictModal');
     return !!(root && root.innerHTML.trim() !== '');
   };
+  // 読み上げの「画面を真っ黒にするモード」（js/speech.js）の間は、電池を使わないよう
+  // 定期の同期チェックを止める。戻ったときに 'ronsho:speechDarkClosed' で1回だけ行う
+  function isSpeechDarkActive() {
+    try {
+      const el = document.documentElement;
+      return !!(el && el.classList && el.classList.contains('speechDarkActive'));
+    } catch (e) { return false; }
+  }
+
   function maybePullIfIdle() {
     if (syncSuspended || syncInFlight) return;
+    if (isSpeechDarkActive()) return;
     if (authGateActive) return; // ログイン待ちの間は、無言の再ログイン試行を繰り返さない
     if (isConflictModalOpen()) return; // 競合の選択待ちの間は取得し直さない
     if (hasUnsyncedLocalChanges()) return; // 未同期のローカル変更があれば、こちらからは取得しない
@@ -1133,7 +1143,8 @@
     getRevision: () => revision,
     setRevision: (v) => { revision = v; localStorage.setItem(REVISION_KEY, String(v)); },
     getLast: () => last,
-    markSynced
+    markSynced,
+    maybePullIfIdle, isSpeechDarkActive
   };
 
   window.addEventListener('load', () => {
@@ -1180,6 +1191,7 @@
     setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       if (syncInFlight) return;
+      if (isSpeechDarkActive()) return; // 読み上げで画面を真っ黒にしている間は止め、戻ったときに行う
       if (authGateActive) return; // ログイン待ちの間は、無言の再ログイン試行を繰り返さない
       if (isConflictModalOpen()) return;
       if (hasUnsyncedLocalChanges()) queue();
@@ -1193,5 +1205,12 @@
       if (document.visibilityState === 'visible') maybePullIfIdle();
     });
     window.addEventListener('focus', maybePullIfIdle);
+
+    // 読み上げの真っ黒の画面から戻ったら、止めていた同期チェックを1回だけ行う
+    document.addEventListener('ronsho:speechDarkClosed', () => {
+      if (authGateActive || isConflictModalOpen()) return;
+      if (hasUnsyncedLocalChanges()) queue();
+      else maybePullIfIdle();
+    });
   });
 })();
