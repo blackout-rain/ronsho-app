@@ -570,8 +570,32 @@ console.log('\n■ D3: アーカイブ一覧は有効な記録だけを表示し
   check('件数表示は2件', html.includes('2件のアーカイブ'));
 }
 
+// 読み上げの「画面を真っ黒にするモード」の間は、電池を使わないよう定期の取り込みを止める
+async function speechDarkPauseTest() {
+  console.log('\n■ S1: 読み上げで画面を真っ黒にしている間は、定期の取り込みをしない');
+  const gas = makeMockGas(makeCloudStore([mkEntry('A', '本文A', '民法')], 10));
+  const dev = loadDevice(gas);
+  await dev.api.pullFromCloud(false);
+  let gets = 0;
+  dev.sandbox.fetch = async (url, opts) => { if (!opts || opts.method !== 'POST') gets++; return gas.fetchImpl(url, opts); };
+  const classes = new Set(['speechDarkActive']);
+  dev.sandbox.document.documentElement = { classList: { contains: c => classes.has(c) } };
+  check('真っ黒の画面を見分けられる', dev.api.isSpeechDarkActive() === true);
+  check('同期の前提：未同期の変更は無い', dev.api.hasUnsyncedLocalChanges() === false);
+  dev.api.maybePullIfIdle();
+  await new Promise(r => setImmediate(r));
+  check('真っ黒の間は取り込みに行かない', gets === 0, 'GET ' + gets + '回');
+  classes.delete('speechDarkActive');
+  dev.api.maybePullIfIdle();
+  for (let i = 0; i < 5; i++) await new Promise(r => setImmediate(r));
+  check('戻ったら取り込みに行く', gets === 1, 'GET ' + gets + '回');
+  delete dev.sandbox.document.documentElement;
+  check('documentElement が無い環境でも止まらない', dev.api.isSpeechDarkActive() === false);
+}
+
 (async () => {
   await e2e();
+  await speechDarkPauseTest();
   console.log('\n' + (failures === 0 ? '🎉 全チェック合格' : `⚠️ ${failures}件のチェックが不合格`));
   process.exit(failures === 0 ? 0 : 1);
 })();

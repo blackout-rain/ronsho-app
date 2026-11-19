@@ -4,6 +4,10 @@ let speechQueue = [];
 let speechIndex = 0;
 let speechIsPlaying = false;
 let speechGapTimer = null;
+// 画面を真っ黒にしている最中か（下の「画面を真っ黒にするモード」で使う。ほかの関数からも見るため先に宣言する）
+let speechDarkOpen = false;
+// 真っ黒の間は見えない読み上げ画面を描き直さず、戻ったときに1回だけ描き直す
+let speechDarkCardStale = false;
 const SPEECH_TITLE_BODY_PAUSE_MS = 700;
 const SPEECH_ENTRY_PAUSE_MS = 1400;
 // 「読み上げ」タブを開いたときに最初から選ばれている内容を、設定画面
@@ -287,6 +291,9 @@ function buildSilentWavUrl() {
   return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
 }
 function speechBackgroundEnabled() {
+  // 真っ黒の画面の間は画面を点けたままなので、無音の音声は要らない（電池を使うだけ）。
+  // iPadでは画面を消すとどのみち止められることも v31.3 で確かめ済み。戻ったら流し直す
+  if (speechDarkOpen) return false;
   const chk = document.getElementById('speechBackgroundChk');
   return !chk || chk.checked;
 }
@@ -470,11 +477,37 @@ function releaseSpeechWakeLock() {
 // 読み上げが止められるため、画面は点けたまま全体を真っ黒にして画面オフの代わりにする。
 // うっかり触って戻らないよう、2回タップ（3秒以内）で戻る
 const SPEECH_DARK_DOUBLE_TAP_MS = 3000;
-let speechDarkOpen = false;
 let speechDarkLastTapAt = 0;
 let speechDarkHintTimer = null;
 function speechDarkTapAction(now, lastTapAt) {
   return lastTapAt > 0 && now - lastTapAt <= SPEECH_DARK_DOUBLE_TAP_MS ? 'close' : 'hint';
+}
+// iPad mini などの液晶の画面は、黒を映しても後ろのライトが点いたままなので、
+// 真っ黒にするだけでは電池はあまり持たない。ウェブアプリからは明るさを変えられない
+// ため、明るさを下げる方法を案内する
+function speechDarkHintText(wakeLockOk, nav) {
+  const brightness = speechIsAppleMobile(nav)
+    ? '電池を長持ちさせるには、画面の右上から下へなぞって\nコントロールセンターを出し、明るさ（☀）をいちばん下にしてください。'
+    : '電池を長持ちさせるには、画面の明るさをいちばん下にしてください。';
+  const head = wakeLockOk
+    ? '🌑 画面を暗くしました。読み上げは続きます。'
+    : '⚠ 画面が自動で消えるのを止められませんでした。\niPadの「設定 → 画面表示と明るさ → 自動ロック」を「なし」にしてください。';
+  return head + '\n\n' + brightness + '\n\n2回タップで戻ります';
+}
+const SPEECH_DARK_HINT_MS = 10000;
+const SPEECH_DARK_HINT_WARN_MS = 15000;
+// 真っ黒の間は、Safariの上の帯（theme-color の色で塗られる）も黒くする
+let speechDarkSavedThemeColor = null;
+function setSpeechDarkThemeColor(on) {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta || !meta.setAttribute) return;
+  if (on) {
+    if (speechDarkSavedThemeColor === null) speechDarkSavedThemeColor = meta.getAttribute('content') || '';
+    meta.setAttribute('content', '#000000');
+  } else if (speechDarkSavedThemeColor !== null) {
+    meta.setAttribute('content', speechDarkSavedThemeColor);
+    speechDarkSavedThemeColor = null;
+  }
 }
 function showSpeechDarkHint(text, ms) {
   const hint = document.getElementById('speechDarkHint');
@@ -491,14 +524,13 @@ function openSpeechDarkScreen() {
   speechDarkLastTapAt = 0;
   ov.classList.add('show');
   document.documentElement.classList.add('speechDarkActive');
+  setSpeechDarkThemeColor(true);
+  // 無音の音声は止める（speechBackgroundEnabled が真っ黒の間は false を返すので、流し直されない）
+  stopSpeechBackgroundAudio();
   if (!speechIsPlaying) startSpeech();
   acquireSpeechWakeLock().then(ok => {
     if (!speechDarkOpen) return;
-    if (ok) {
-      showSpeechDarkHint('🌑 画面を暗くしました。読み上げは続きます。\n2回タップで戻ります', 5000);
-    } else {
-      showSpeechDarkHint('⚠ 画面が自動で消えるのを止められませんでした。\niPadの「設定 → 画面表示と明るさ → 自動ロック」を「なし」にしてください。\n2回タップで戻ります', 12000);
-    }
+    showSpeechDarkHint(speechDarkHintText(ok, typeof navigator !== 'undefined' ? navigator : null), ok ? SPEECH_DARK_HINT_MS : SPEECH_DARK_HINT_WARN_MS);
   });
 }
 function closeSpeechDarkScreen() {
@@ -507,7 +539,18 @@ function closeSpeechDarkScreen() {
   speechDarkLastTapAt = 0;
   if (ov) ov.classList.remove('show');
   document.documentElement.classList.remove('speechDarkActive');
-  if (!speechIsPlaying) releaseSpeechWakeLock();
+  setSpeechDarkThemeColor(false);
+  if (speechIsPlaying) {
+    startSpeechBackgroundAudio();
+  } else {
+    releaseSpeechWakeLock();
+  }
+  if (speechDarkCardStale) {
+    speechDarkCardStale = false;
+    renderSpeechCurrentCard();
+  }
+  // 真っ黒の間に止めていたクラウド同期の定期チェックを、ここで1回だけ行う（drive-sync.js）
+  try { document.dispatchEvent(new Event('ronsho:speechDarkClosed')); } catch (e) {}
 }
 (() => {
   const ov = document.getElementById('speechDarkOverlay');
@@ -703,6 +746,11 @@ if (speechCurrentCardEl) {
 }
 // ▲▲▲ 読み仮名カード ここまで ▲▲▲
 function renderSpeechCurrentCard() {
+  if (speechDarkOpen) {
+    // 真っ黒の間は見えないので描き直さない（電池を使わないように）。戻ったときに描き直す
+    speechDarkCardStale = true;
+    return;
+  }
   const el = document.getElementById('speechCurrentCard');
   if (!el) return;
   if (speechQueue.length === 0) {

@@ -1501,6 +1501,7 @@ input[type=file] { display:none; }
 }
 .speechDarkOverlay.show { display: flex; }
 html.speechDarkActive, html.speechDarkActive body { overflow: hidden; } /* 真っ黒の間は後ろの画面をスクロールさせず、スクロールバーも出さない */
+html.speechDarkActive, html.speechDarkActive body { background: #000; } /* 画面の端・安全領域（ノッチ・ホームバーの辺り）も黒くする */
 html.speechDarkActive { scrollbar-gutter: auto; } /* パソコンでスクロールバー分の隙間が明るく残らないように */
 .speechDarkHint {
   color: #666; font-size: 14px; line-height: 1.8; text-align: center; white-space: pre-line;
