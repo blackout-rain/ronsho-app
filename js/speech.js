@@ -291,9 +291,6 @@ function buildSilentWavUrl() {
   return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
 }
 function speechBackgroundEnabled() {
-  // 真っ黒の画面の間は画面を点けたままなので、無音の音声は要らない（電池を使うだけ）。
-  // iPadでは画面を消すとどのみち止められることも v31.3 で確かめ済み。戻ったら流し直す
-  if (speechDarkOpen) return false;
   const chk = document.getElementById('speechBackgroundChk');
   return !chk || chk.checked;
 }
@@ -525,8 +522,8 @@ function openSpeechDarkScreen() {
   ov.classList.add('show');
   document.documentElement.classList.add('speechDarkActive');
   setSpeechDarkThemeColor(true);
-  // 無音の音声は止める（speechBackgroundEnabled が真っ黒の間は false を返すので、流し直されない）
-  stopSpeechBackgroundAudio();
+  // 無音の音声・音の種類（audioSession）には触らない。v31.5 で真っ黒にするときに止めたら、
+  // iPadで読み上げが止まってしまった（読み上げ中に音の種類が変わると切られるため）
   if (!speechIsPlaying) startSpeech();
   acquireSpeechWakeLock().then(ok => {
     if (!speechDarkOpen) return;
@@ -540,11 +537,7 @@ function closeSpeechDarkScreen() {
   if (ov) ov.classList.remove('show');
   document.documentElement.classList.remove('speechDarkActive');
   setSpeechDarkThemeColor(false);
-  if (speechIsPlaying) {
-    startSpeechBackgroundAudio();
-  } else {
-    releaseSpeechWakeLock();
-  }
+  if (!speechIsPlaying) releaseSpeechWakeLock();
   if (speechDarkCardStale) {
     speechDarkCardStale = false;
     renderSpeechCurrentCard();
