@@ -530,27 +530,26 @@ console.log('\n■ 読み上げ：真っ黒の間は電池を使う仕事を止�
     globalThis.__play = 0; globalThis.__pause = 0;
     speechSilentAudio = { play: () => { __play++; return Promise.resolve(); }, pause: () => { __pause++; } };
     delete navigator.wakeLock;
+    navigator.audioSession = { type: 'playback' };
     speechQueue = [];
     speechIsPlaying = true;
   `);
   sp('openSpeechDarkScreen()');
+  eq('真っ黒にしても音の種類（audioSession）は「再生」のまま', sp('navigator.audioSession.type'), 'playback');
   eq('真っ黒の間は Safari の上の帯の色（theme-color）も黒にする', sp('__meta.attrs.content'), '#000000');
   check('真っ黒の間はページ全体に印を付ける（背景も黒・同期チェックを止める目印）', sp('__htmlCls.has("speechDarkActive")'));
-  check('真っ黒にしたら無音の音声を止める', sp('__pause') >= 1, 'pause ' + sp('__pause') + '回');
-  sp('startSpeechBackgroundAudio()');
-  eq('真っ黒の間は無音の音声を流し直さない', sp('__play'), 0);
+  // v31.5 で真っ黒にするときに無音の音声を止めたら、iPadで読み上げが止まった。触らないこと
+  eq('真っ黒にしても無音の音声は止めない（読み上げが止まるため）', sp('__pause'), 0);
   sp('__getEl("speechCurrentCard").innerHTML = "前の表示"; renderSpeechCurrentCard();');
   eq('真っ黒の間は見えない画面を描き直さない', sp('__getEl("speechCurrentCard").innerHTML'), '前の表示');
   sp('closeSpeechDarkScreen()');
   eq('戻ったら theme-color を元の色に戻す', sp('__meta.attrs.content'), '#0057e7');
   check('戻ったらページの印を外す', !sp('__htmlCls.has("speechDarkActive")'));
-  eq('戻ったとき読み上げ中なら無音の音声を流し直す', sp('__play'), 1);
+  eq('戻っても無音の音声を流し直さない（音の種類を変えない）', [sp('__play'), sp('__pause'), sp('navigator.audioSession.type')], [0, 0, 'playback']);
   check('戻ったら止めていた画面を1回描き直す', /speechEmpty/.test(sp('__getEl("speechCurrentCard").innerHTML')), sp('__getEl("speechCurrentCard").innerHTML'));
   eq('戻ったら同期チェックを1回行うよう知らせる', sp('__events'), ['ronsho:speechDarkClosed']);
   sp('__getEl("speechCurrentCard").innerHTML = "x"; closeSpeechDarkScreen();');
   eq('もう一度戻す操作をしても、描き直しは重ねない', sp('__getEl("speechCurrentCard").innerHTML'), 'x');
-  sp('__play = 0; speechIsPlaying = false; speechDarkOpen = true; closeSpeechDarkScreen();');
-  eq('戻ったとき止まっていれば無音の音声は流さない', sp('__play'), 0);
 }
 
 console.log('\n■ オフライン動作（外部スクリプトに頼らない）');
