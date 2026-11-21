@@ -1,0 +1,898 @@
+[
+ {
+  "exam": "shiho",
+  "year": 8,
+  "kind": "mondai",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001466990.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00295.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 8,
+  "kind": "mondai",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001466991.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00295.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 8,
+  "kind": "mondai",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001466992.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00295.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 8,
+  "kind": "mondai",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001466993.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00295.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 8,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001474287.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00290.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 7,
+  "kind": "jikkan",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001453798.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00285.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 7,
+  "kind": "jikkan",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001453799.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00285.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 7,
+  "kind": "jikkan",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001453800.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00285.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 7,
+  "kind": "jikkan",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001453801.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00285.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 7,
+  "kind": "mondai",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001443623.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00267.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 7,
+  "kind": "mondai",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001443624.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00267.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 7,
+  "kind": "mondai",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001443625.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00267.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 7,
+  "kind": "mondai",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001443626.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00267.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 7,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001450299.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00265.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 6,
+  "kind": "jikkan",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001429890.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00260.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 6,
+  "kind": "jikkan",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001429891.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00260.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 6,
+  "kind": "jikkan",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001429892.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00260.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 6,
+  "kind": "jikkan",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001429893.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00260.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 6,
+  "kind": "mondai",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001421190.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00241.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 6,
+  "kind": "mondai",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001421191.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00241.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 6,
+  "kind": "mondai",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001421192.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00241.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 6,
+  "kind": "mondai",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001421193.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00241.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 6,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001427191.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00236.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 5,
+  "kind": "jikkan",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001408691.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00223.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 5,
+  "kind": "jikkan",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001408692.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00223.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 5,
+  "kind": "jikkan",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001408693.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00223.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 5,
+  "kind": "jikkan",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001408694.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00223.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 5,
+  "kind": "mondai",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001415895.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00198.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 5,
+  "kind": "mondai",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001415896.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00198.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 5,
+  "kind": "mondai",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001415897.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00198.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 5,
+  "kind": "mondai",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001415898.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00198.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 5,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001415935.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00196.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 4,
+  "kind": "jikkan",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001382903.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00186.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 4,
+  "kind": "jikkan",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001382904.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00186.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 4,
+  "kind": "jikkan",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001382905.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00186.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 4,
+  "kind": "jikkan",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001385312.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00186.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 4,
+  "kind": "mondai",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001371989.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00104.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 4,
+  "kind": "mondai",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001371990.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00104.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 4,
+  "kind": "mondai",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001371991.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00104.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 4,
+  "kind": "mondai",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001373070.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00104.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 4,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001380005.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00092.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 3,
+  "kind": "jikkan",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001357780.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00080.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 3,
+  "kind": "jikkan",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001357781.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00080.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 3,
+  "kind": "jikkan",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001357782.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00080.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 3,
+  "kind": "jikkan",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001358131.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00080.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 3,
+  "kind": "mondai",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001348315.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00056.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 3,
+  "kind": "mondai",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001348317.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00056.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 3,
+  "kind": "mondai",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001350705.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00056.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 3,
+  "kind": "mondai",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001350706.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00056.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 3,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001355370.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00051.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 2,
+  "kind": "jikkan",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001344496.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00053.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 2,
+  "kind": "jikkan",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001344498.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00053.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 2,
+  "kind": "jikkan",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001344499.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00053.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 2,
+  "kind": "jikkan",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001344847.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00053.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 2,
+  "kind": "mondai",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001326056.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00016.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 2,
+  "kind": "mondai",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001326057.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00016.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 2,
+  "kind": "mondai",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001326058.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00016.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 2,
+  "kind": "mondai",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001326059.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00016.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 2,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001339369.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00007.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 1,
+  "kind": "jikkan",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001308861.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00005.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 1,
+  "kind": "jikkan",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001308862.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00005.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 1,
+  "kind": "jikkan",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001308863.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00005.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 1,
+  "kind": "jikkan",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001308864.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00005.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 1,
+  "kind": "mondai",
+  "group": "公法系科目",
+  "pdf": "https://www.moj.go.jp/content/001293666.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00177.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 1,
+  "kind": "mondai",
+  "group": "刑事系科目",
+  "pdf": "https://www.moj.go.jp/content/001293667.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00177.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 1,
+  "kind": "mondai",
+  "group": "民事系科目",
+  "pdf": "https://www.moj.go.jp/content/001293668.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00177.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 1,
+  "kind": "mondai",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001293669.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00177.html"
+ },
+ {
+  "exam": "shiho",
+  "year": 1,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001305186.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji08_00175.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 8,
+  "kind": "mondai",
+  "group": "憲法・行政法",
+  "pdf": "https://www.moj.go.jp/content/001470552.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00317.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 8,
+  "kind": "mondai",
+  "group": "民法・商法・民事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001470553.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00317.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 8,
+  "kind": "mondai",
+  "group": "刑法・刑事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001470554.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00317.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 8,
+  "kind": "mondai",
+  "group": "法律実務基礎科目（民事・刑事）",
+  "pdf": "https://www.moj.go.jp/content/001470555.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00317.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 8,
+  "kind": "mondai",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001470556.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00317.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 7,
+  "kind": "mondai",
+  "group": "憲法・行政法",
+  "pdf": "https://www.moj.go.jp/content/001446285.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00287.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 7,
+  "kind": "mondai",
+  "group": "民法・商法・民事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001446286.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00287.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 7,
+  "kind": "mondai",
+  "group": "刑法・刑事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001446287.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00287.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 7,
+  "kind": "mondai",
+  "group": "法律実務基礎科目（民事・刑事）",
+  "pdf": "https://www.moj.go.jp/content/001446288.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00287.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 7,
+  "kind": "mondai",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001446289.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00287.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 7,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001456182.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00285.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 6,
+  "kind": "mondai",
+  "group": "憲法・行政法",
+  "pdf": "https://www.moj.go.jp/content/001424479.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00228.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 6,
+  "kind": "mondai",
+  "group": "民法・商法・民事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001424480.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00228.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 6,
+  "kind": "mondai",
+  "group": "刑法・刑事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001424481.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00228.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 6,
+  "kind": "mondai",
+  "group": "法律実務基礎科目（民事・刑事）",
+  "pdf": "https://www.moj.go.jp/content/001424482.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00228.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 6,
+  "kind": "mondai",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001424483.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00228.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 6,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001432532.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00213.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 5,
+  "kind": "mondai",
+  "group": "憲法・行政法",
+  "pdf": "https://www.moj.go.jp/content/001402749.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00151.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 5,
+  "kind": "mondai",
+  "group": "民法・商法・民事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001402750.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00151.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 5,
+  "kind": "mondai",
+  "group": "刑法・刑事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001402751.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00151.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 5,
+  "kind": "mondai",
+  "group": "法律実務基礎科目（民事・刑事）",
+  "pdf": "https://www.moj.go.jp/content/001402752.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00151.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 5,
+  "kind": "mondai",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001402753.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00151.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 5,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001411617.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00144.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 4,
+  "kind": "mondai",
+  "group": "憲法・行政法",
+  "pdf": "https://www.moj.go.jp/content/001376759.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00102.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 4,
+  "kind": "mondai",
+  "group": "民法・商法・民事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001376760.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00102.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 4,
+  "kind": "mondai",
+  "group": "刑法・刑事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001376761.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00102.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 4,
+  "kind": "mondai",
+  "group": "法律実務基礎科目（民事・刑事）",
+  "pdf": "https://www.moj.go.jp/content/001376762.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00102.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 4,
+  "kind": "mondai",
+  "group": "選択科目",
+  "pdf": "https://www.moj.go.jp/content/001376763.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00102.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 4,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001386520.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00098.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 3,
+  "kind": "mondai",
+  "group": "憲法・行政法",
+  "pdf": "https://www.moj.go.jp/content/001352746.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00068.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 3,
+  "kind": "mondai",
+  "group": "民法・商法・民事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001352747.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00068.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 3,
+  "kind": "mondai",
+  "group": "刑法・刑事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001352748.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00068.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 3,
+  "kind": "mondai",
+  "group": "法律実務基礎科目（民事・刑事）",
+  "pdf": "https://www.moj.go.jp/content/001352749.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00068.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 3,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001358663.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00065.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 2,
+  "kind": "mondai",
+  "group": "憲法・行政法",
+  "pdf": "https://www.moj.go.jp/content/001330819.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00016.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 2,
+  "kind": "mondai",
+  "group": "民法・商法・民事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001330820.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00016.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 2,
+  "kind": "mondai",
+  "group": "刑法・刑事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001330821.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00016.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 2,
+  "kind": "mondai",
+  "group": "法律実務基礎科目（民事・刑事）",
+  "pdf": "https://www.moj.go.jp/content/001330823.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00016.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 2,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001340861.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00004.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 1,
+  "kind": "mondai",
+  "group": "憲法・行政法",
+  "pdf": "https://www.moj.go.jp/content/001299737.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00245.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 1,
+  "kind": "mondai",
+  "group": "刑法・刑事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001299738.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00245.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 1,
+  "kind": "mondai",
+  "group": "民法・商法・民事訴訟法",
+  "pdf": "https://www.moj.go.jp/content/001299739.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00245.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 1,
+  "kind": "mondai",
+  "group": "法律実務基礎科目（民事・刑事）",
+  "pdf": "https://www.moj.go.jp/content/001299740.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00245.html"
+ },
+ {
+  "exam": "yobi",
+  "year": 1,
+  "kind": "shushi",
+  "group": "all",
+  "pdf": "https://www.moj.go.jp/content/001309069.pdf",
+  "page": "https://www.moj.go.jp/jinji/shihoushiken/jinji07_00243.html"
+ }
+]

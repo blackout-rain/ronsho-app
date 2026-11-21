@@ -32,6 +32,8 @@
   const PRECEDENT_KEY = 'ronshoPrecedentsV1';
   const BOOKS_KEY = 'ronshoBooksV1';
   const LAWREF_VIEW_KEY = 'ronshoLawRefViewV1';
+  // 過去問の資料（問題・出題趣旨・採点実感）の「読んだ」印（js/exam-docs.js、v32.0〜）
+  const EXAM_READ_KEY = 'ronshoExamReadV1';
   // 編集競合でマージした論証タイトルの記録。バナー→重複チェックで確認する
   // ためのもので、他端末でも同じバナーが出るよう同期対象に含める
   const SYNC_CONFLICTS_KEY = 'ronshoSyncConflictsV1';
@@ -74,6 +76,7 @@
     precedents: '⚖️ 判例',
     books: '📖 書籍',
     lawRefView: '📜 条文リンク表示',
+    examRead: '📄 過去問の資料の「読んだ」印',
     orphanEntryArchive: '🔗 引き継がれなかった学習記録の内容',
     theme: '🌓 表示テーマ',
     petEnabled: '🐾 ペット表示設定',
@@ -164,6 +167,7 @@
     precedents: read(PRECEDENT_KEY, []),
     books: read(BOOKS_KEY, []),
     lawRefView: readRaw(LAWREF_VIEW_KEY, ''),
+    examRead: read(EXAM_READ_KEY, {}),
     theme: readRaw(THEME_KEY, ''),
     petEnabled: readRaw(PET_ENABLED_KEY, ''),
     petSpecies: readRaw(PET_SPECIES_KEY, ''),
@@ -242,6 +246,7 @@
       write(PRECEDENT_KEY, data.precedents || []);
       write(BOOKS_KEY, data.books || []);
       writeRaw(LAWREF_VIEW_KEY, data.lawRefView);
+      write(EXAM_READ_KEY, data.examRead && typeof data.examRead === 'object' && !Array.isArray(data.examRead) ? data.examRead : {});
       writeRaw(THEME_KEY, data.theme);
       writeRaw(PET_ENABLED_KEY, data.petEnabled);
       writeRaw(PET_SPECIES_KEY, data.petSpecies);
@@ -288,6 +293,7 @@
       if (typeof renderCountdownCard === 'function') renderCountdownCard();
       if (typeof renderDupArchive === 'function') renderDupArchive();
       if (typeof renderPastMatrixTable === 'function') renderPastMatrixTable();
+      if (typeof renderExamDocsIfOpen === 'function') renderExamDocsIfOpen();
       if (typeof renderSpeechDictList === 'function') renderSpeechDictList();
       if (typeof renderOrphanedStudyLog === 'function') renderOrphanedStudyLog();
       if (typeof renderPrecedentPage === 'function') renderPrecedentPage();

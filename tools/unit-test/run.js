@@ -343,7 +343,10 @@ console.log('\n■ localStorageキーの同期登録漏れ');
     ronshoPastMatrixEraV1: '過去問マトリクスの令和/平成の表示切替（見た目だけ）',
     ronshoSpeechVoiceV1: '読み上げの声（端末に入っている声の一覧が端末ごとに違い、他の端末では同じ声が無いことが多い）',
     ronshoXpMigratedFromLegacyV1: 'XPの移行処理済みフラグ（端末ごとの内部管理）',
-    ronshoXpPastExamMigratedV1: 'XPの移行処理済みフラグ（端末ごとの内部管理）'
+    ronshoXpPastExamMigratedV1: 'XPの移行処理済みフラグ（端末ごとの内部管理）',
+    ronshoExamDocsDB: '過去問の資料（問題・出題趣旨・採点実感）の控えの保存先（IndexedDBの名前。約4MBあり、各端末で取り直せる）',
+    ronshoExamPracticeV1: '「時間を計って解く」の解答中の状態（その端末で解いている最中だけのもの）',
+    ronshoExamDocsViewV1: '過去問の資料の並べ方・色分けの表示の好み（3列表示は画面の広さで選ぶもの）'
   };
   const syncCode = read('drive-sync.js');
   const backupCode = read(path.join('js', 'backup.js'));
@@ -565,6 +568,147 @@ console.log('\n■ オフライン動作（外部スクリプトに頼らない�
     srcs.filter(s => !/^https?:/.test(s) && !precache.has(s.replace(/^\.\//, ''))), []);
   eq('事前キャッシュするファイルがすべて実在する',
     [...precache].filter(p => p && !fs.existsSync(path.join(ROOT, p))), []);
+}
+
+
+console.log('\n■ 過去問の資料：データ（data/exam/*.json）');
+{
+  const crypto = require('crypto');
+  const index = JSON.parse(read(path.join('data', 'exam', 'index.json')));
+  check('一覧に年度がある', Array.isArray(index.years) && index.years.length >= 16, (index.years || []).length + '件');
+  const bad = [];
+  const files = {};
+  index.years.forEach(y => {
+    const rel = path.join('data', 'exam', y.file);
+    if (!fs.existsSync(path.join(ROOT, rel))) { bad.push(y.file + ' が無い'); return; }
+    const body = read(rel);
+    files[y.file] = JSON.parse(body);
+    const rev = crypto.createHash('sha1').update(body, 'utf8').digest('hex').slice(0, 12);
+    if (rev !== y.rev) bad.push(y.file + ' の rev が中身と合わない（build.py で作り直す）');
+  });
+  eq('一覧のファイルが全部あり、rev が中身と合う', bad, []);
+  const problems = [];
+  Object.keys(files).forEach(f => {
+    const d = files[f];
+    Object.keys(d.subjects).forEach(subj => {
+      Object.keys(d.subjects[subj]).forEach(kind => {
+        const doc = d.subjects[subj][kind];
+        const where = f + ' ' + subj + ' ' + kind;
+        if (!Array.isArray(doc.paras) || doc.paras.length === 0) problems.push(where + '：文が空');
+        if (!/^https:\/\/www\.moj\.go\.jp\//.test(doc.page || '') || !/^https:\/\/www\.moj\.go\.jp\/content\/\d+\.pdf$/.test(doc.pdf || '')) problems.push(where + '：出典のURLが無い');
+        (doc.paras || []).forEach(p => {
+          if (/^[-－]\s*[0-9０-９]+\s*[-－]$/.test(p)) problems.push(where + '：ページ番号が残っている「' + p + '」');
+          if (/司法試験の採点実感（/.test(p)) problems.push(where + '：別の科目の採点実感の見出しが混ざっている');
+        });
+      });
+    });
+  });
+  eq('どの資料にも文と出典があり、ページ番号・別の科目の見出しが混ざっていない', problems.slice(0, 5), []);
+  // 司法試験の令和元〜7年は、8科目すべてに問題・出題趣旨・採点実感がそろう
+  const missing = [];
+  for (let y = 1; y <= 7; y++) {
+    const d = files['shiho-R' + y + '.json'];
+    ['憲法', '行政法', '民法', '商法', '民事訴訟法', '刑法', '刑事訴訟法', '労働法'].forEach(s => {
+      ['mondai', 'shushi', 'jikkan'].forEach(k => { if (!(d && d.subjects[s] && d.subjects[s][k])) missing.push('R' + y + s + k); });
+    });
+  }
+  eq('司法試験 令和元〜7年：8科目×3種類がそろう', missing, []);
+  const yobiMissing = [];
+  for (let y = 1; y <= 7; y++) {
+    const d = files['yobi-R' + y + '.json'];
+    const subs = ['憲法', '行政法', '民法', '商法', '民事訴訟法', '刑法', '刑事訴訟法', '実務基礎民事', '実務基礎刑事'].concat(y >= 4 ? ['労働法'] : []);
+    subs.forEach(s => ['mondai', 'shushi'].forEach(k => { if (!(d && d.subjects[s] && d.subjects[s][k])) yobiMissing.push('R' + y + s + k); }));
+  }
+  eq('予備試験 令和元〜7年：問題・出題趣旨がそろう（労働法は令和4年から）', yobiMissing, []);
+  const yobiJikkan = Object.keys(files).filter(f => f.startsWith('yobi')).filter(f => Object.values(files[f].subjects).some(x => x.jikkan));
+  eq('予備試験には採点実感が無い（公表されていない）', yobiJikkan, []);
+  const r7 = files['shiho-R7.json'];
+  check('問題文の段落が文の途中で切れていない（令和7年 憲法の1段落目）', /。$/.test(r7.subjects['憲法'].mondai.paras[1]), r7.subjects['憲法'].mondai.paras[1]);
+  check('ぶら下げの箇条書き（○…）を1段落にまとめる', r7.subjects['行政法'].jikkan.paras.some(p => /^○　行政事件訴訟法.*判断した。$/.test(p)));
+}
+
+console.log('\n■ 過去問の資料：表示・色分け・読んだ印・論証とのつながり・解答');
+{
+  const ex = loadApp(['js/core.js', 'js/past-exam.js', 'js/lawref.js', 'js/exam-docs.js']);
+  const cls = ex('examDocsClassifySentence');
+  eq('注意点の文を赤にする', [cls('判例の理解が不十分な答案が散見された。'), cls('結論のみを示す答案が少なくなかった。'), cls('事実を書き写しただけの答案もあった。')], ['bad', 'bad', 'bad']);
+  eq('良い例の文を緑にする', [cls('判断枠組みを正確に示した答案は高く評価できた。'), cls('多くの答案がよく書けていた。')], ['good', 'good']);
+  eq('どちらでもない文は色なし', cls('以下は、考査委員の意見をまとめたものである。'), '');
+  eq('採点方針の説明（「的確に行うことができるかを問う」）は緑にしない', cls('基礎的な理解を確認し、その応用を的確に行うことができるか否かを問うこととした。'), '');
+  eq('「的確に」でも答案の話なら緑', cls('事案を的確に分析している答案が多かった。'), 'good');
+  eq('良い点と注意点が両方ある文は注意点を優先', cls('一般論はよく書けていたが、あてはめは不十分であった。'), 'bad');
+  eq('「。」で文に分ける', ex('examDocsSplitSentences')('一つ目。二つ目。三つ目'), ['一つ目。', '二つ目。', '三つ目']);
+  const isH = ex('examDocsIsHeading');
+  eq('見出しを見分ける', [isH('〔第１問〕（配点：１００）'), isH('［労働法］'), isH('１　出題の趣旨'), isH('⑵　設問１⑵'), isH('本問は、表現の自由を問うものである。')], [true, true, true, true, false]);
+  const body = ex('examDocsBodyHtml');
+  const paras = ['〔設問１〕', '答案はよく書けていた。', '検討が不十分な答案が多かった。', '<script>alert(1)</script>'];
+  const hlHtml = body(paras, { hl: true, filter: 'all' });
+  check('文の中のタグはエスケープする', !/<script/.test(hlHtml) && /&lt;script&gt;/.test(hlHtml), hlHtml);
+  check('色分けすると良い例・注意点に印が付く', /class="examHlGood"/.test(hlHtml) && /class="examHlBad"/.test(hlHtml), hlHtml);
+  const badOnly = body(paras, { hl: true, filter: 'bad' });
+  check('「注意点だけ」でも見出しは残し、良い例は隠す', /設問１/.test(badOnly) && /不十分/.test(badOnly) && !/よく書けて/.test(badOnly), badOnly);
+  eq('色分けの数を数える', ex('examDocsCountMarks')(paras), { good: 1, bad: 1 });
+  // 条文リンクは法律名つきだけ（科目を渡さない）。「本件条例第３２条」のような架空の法令に付けないため
+  const refs = ex('lawrefFindRefs')('民法第４１５条の請求と、本件条例第３２条の勧告。行訴法第９条第１項', null);
+  eq('法律名つきの参照だけをリンクにする', refs.map(r => r.label), ['民法415条', '行訴法9条第1項']);
+
+  // 読んだ印
+  const setRead = ex('examDocsSetRead');
+  let map = {};
+  map = setRead(map, '新司法試験', 7, '民法', 'mondai', true, '2026-01-02');
+  map = setRead(map, '新司法試験', 7, '民法', 'jikkan', true, '2026-01-03');
+  eq('読んだ印は種類ごとに日付で持つ', map, { '新司法試験|7|民法': { m: '2026-01-02', j: '2026-01-03' } });
+  const isRead = ex('examDocsIsRead');
+  eq('読んだかどうかを引ける', [isRead(map, '新司法試験', 7, '民法', 'mondai'), isRead(map, '新司法試験', 7, '民法', 'shushi'), isRead(map, '予備試験', 7, '民法', 'mondai')], [true, false, false]);
+  const before = JSON.stringify(map);
+  const map2 = setRead(map, '新司法試験', 7, '民法', 'mondai', false);
+  const map3 = setRead(map2, '新司法試験', 7, '民法', 'jikkan', false);
+  eq('印を外すと消え、全部外すと項目ごと消える（元の map は変えない）', [map3, JSON.stringify(map) === before], [{}, true]);
+  eq('年度の進み具合（公表されている資料のうち読んだ数）', ex('examDocsYearProgress')(map, '新司法試験', 7, { subjects: { 民法: ['mondai', 'shushi', 'jikkan'], 憲法: ['mondai'] } }), { total: 4, done: 2 });
+  ex('saveExamRead')(map);
+  eq('読んだ印を保存して読み戻せる', ex('loadExamRead()'), map);
+  ex('localStorage.setItem("ronshoExamReadV1", "[壊れた")');
+  eq('壊れた値でも空として読む', ex('loadExamRead()'), {});
+
+  // 論証の「出題年」
+  const tok = ex('examDocsParseYearToken');
+  eq('出題年の区切りから令和の年と試験を読む', [tok('R5|#2fff2e'), tok('R元|#00ccff'), tok('Ｒ７|'), tok('H30|#2fff2e')].map(t => t && [t.year, t.examType]), [[5, '新司法試験'], [1, '予備試験'], [7, null], null]);
+  const list = [
+    { title: 'A', subject: '民法', year: 'R5|#2fff2e;H30|#2fff2e' },
+    { title: 'B', subject: '民法', year: 'R5|#00ccff' },
+    { title: 'C', subject: '民法', year: 'R5|' },
+    { title: 'D', subject: '刑法', year: 'R5|#2fff2e' },
+    { title: 'E', subject: '民法', year: 'R15|#2fff2e' }
+  ];
+  eq('同じ年度・科目の論証（色の無い年度はどちらの試験にも出す）', ex('examDocsRelatedEntries')(list, '新司法試験', 5, '民法').map(e => e.title), ['A', 'C']);
+  eq('予備試験なら水色と色なし', ex('examDocsRelatedEntries')(list, '予備試験', 5, '民法').map(e => e.title), ['B', 'C']);
+  const links = ex('examDocsYearLinksHtml')({ subject: '民法', year: 'R5|#2fff2e;H30|#2fff2e;R6|red"><b>' }, '新司法試験');
+  check('令和の年度だけ資料へのリンクにする', (links.match(/examYearLink/g) || []).length === 2 && /data-year="5"/.test(links) && !/data-year="30"/.test(links), links);
+  check('年度のリンクに不正な色・タグを埋め込まない', !/<b>|red"/.test(links), links);
+
+  // 解答の時間
+  const fmt = ex('examDocsFormatRemaining');
+  eq('残り時間の表示', [fmt(3909000), fmt(59000), fmt(-180000)], ['1:05:09', '0:00:59', '-0:03:00']);
+  const mins = ex('examDocsDefaultMinutes');
+  eq('試験時間の目安', [mins('新司法試験', '民法'), mins('新司法試験', '労働法'), mins('予備試験', '刑法'), mins('予備試験', '実務基礎民事')], [120, 180, 70, 90]);
+  // 書き終えたら：解答ログに次の回数で1件足し、問題を読んだ印にし、解答中を終える
+  ex('localStorage.setItem("ronshoPastExamLogs_v1", JSON.stringify([{ examType: "新司法試験", subject: "民法", year: "令和7年", round: 1, date: "2025-01-01", memo: "" }]))');
+  ex('localStorage.setItem("ronshoExamReadV1", "{}")');
+  ex('saveExamPractice({ examType: "新司法試験", year: 7, subject: "民法", startedAt: Date.now() - 30 * 60000, minutes: 120 })');
+  const msg = ex('examDocsFinishPractice()');
+  const logs = ex('loadPastExamLogs()');
+  const added = logs.filter(l => l.subject === '民法' && l.year === '令和7年' && l.round === 2);
+  check('書き終えたら解答ログに2回目を足す', added.length === 1 && /^\d{4}-\d{2}-\d{2}$/.test(added[0].date), JSON.stringify(logs));
+  check('記録した回数と時間を知らせる', /2回目/.test(msg) && /30分/.test(msg), msg);
+  eq('書き終えたら問題を読んだ印にする', ex('examDocsIsRead(loadExamRead(), "新司法試験", 7, "民法", "mondai")'), true);
+  eq('書き終えたら解答中を終える', ex('loadExamPractice()'), null);
+  eq('解答中でなければ何もしない', ex('examDocsFinishPractice()'), '');
+  ex('localStorage.setItem("ronshoExamPracticeV1", "{壊れた")');
+  eq('壊れた解答中の値は無視する', ex('loadExamPractice()'), null);
+  eq('表示の好みの既定値', ex('loadExamDocsView()'), { layout: 'tabs', hl: true, filter: 'all' });
+  eq('ファイル名', [ex('examDocsFileName("新司法試験", 7)'), ex('examDocsFileName("予備試験", 1)')], ['shiho-R7.json', 'yobi-R1.json']);
+  eq('科目があるか（予備試験の労働法は令和4年から、実務基礎は予備試験だけ）',
+    [ex('examDocsSubjectApplies("予備試験", "労働法", 3)'), ex('examDocsSubjectApplies("予備試験", "労働法", 4)'), ex('examDocsSubjectApplies("新司法試験", "実務基礎民事", 7)')], [false, true, false]);
 }
 
 async function runAsyncChecks() {
