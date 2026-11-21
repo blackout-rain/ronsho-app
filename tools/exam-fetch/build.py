@@ -107,6 +107,10 @@ NEW_PARA = re.compile(
     r'[0-9０-９]+[\s　．.、)）]|[⑴-⒇①-⑳]|[(（][0-9０-９ア-ンa-zａ-ｚⅰ-ⅹ]+[)）]|'
     r'[ア-ン][\s　．.、)）]|第[0-9０-９一二三四五六七八九十]+[\s　])')
 SENTENCE_END = re.compile(r'[。」）)：:】〕］]$')
+# 行頭にあれば、前の行の続き（PDF上は同じ行なのに、ぶら下げの閉じ括弧などが別の行として抜き出される）
+CLOSING_HEAD = re.compile(r'^[）」』】〕］〉》、。，．,.)\]]')
+# 行末にあれば、文の途中（読点で段落は終わらない）
+COMMA_END = re.compile(r'[、，,]$')
 
 
 def right_edge(l):
@@ -132,6 +136,7 @@ def to_paragraphs(lines):
     cur = None
     prev_full = False
     prev_end = True
+    prev_comma = False
     cont_indent = None  # 段落の2行目の字下げ（まだ1行だけなら None）
     first_indent = 0
     for l in lines:
@@ -139,15 +144,27 @@ def to_paragraphs(lines):
         if not s:
             # 空行（ページの変わり目を含む）。前の行が文の途中で一杯まで来ていれば、
             # ページをまたいで続く文なので段落を閉じない
-            if cur is not None and not (prev_full and not prev_end):
+            if cur is not None and not (not prev_end and (prev_full or prev_comma)):
                 paras.append(cur)
                 cur = None
                 prev_full = False
                 prev_end = True
+                prev_comma = False
             continue
         ind = indent_of(l)
         s = re.sub(r'[ 　]{2,}', '　', s)
-        if cur is None or not prev_full:
+        if cur is not None and CLOSING_HEAD.match(s):
+            # 「）であるかに」のように、閉じ括弧・句読点で始まる行は前の行の続き。
+            # 行の長さは前の行のまま（この断片の長さで次の行を判断しない）
+            cur += s
+            prev_end = SENTENCE_END.search(s) is not None
+            prev_comma = COMMA_END.search(s) is not None
+            continue
+        if cur is not None and prev_comma:
+            # 読点（、）で終わる行は文の途中。「この点は、」のあとに別の行として抜き出された
+            # 続き（字下げが大きい・前の行が短い）も、同じ段落の続きにする
+            starts_new = False
+        elif cur is None or not prev_full:
             starts_new = True
         elif prev_end and NEW_PARA.match(s):
             starts_new = True
@@ -168,6 +185,7 @@ def to_paragraphs(lines):
             if cont_indent is None:
                 cont_indent = ind
         prev_end = SENTENCE_END.search(s) is not None
+        prev_comma = COMMA_END.search(s) is not None
         # ページによって1行の幅が少し狭いことがあるので、文の途中で切れている長めの行も続きとみなす
         edge = right_edge(l)
         prev_full = edge >= full - 4 or (not prev_end and edge >= full * 0.75)
