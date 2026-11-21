@@ -211,12 +211,24 @@ function examDocsYearLinksHtml(e, fallbackExamType) {
 
 // --- 解いてから答え合わせ（案8） ---
 // 試験時間の目安（分）。司法試験は1問2時間（選択科目は2問で3時間）、
-// 予備試験は1科目70分（法律実務基礎科目は民事・刑事で3時間＝各90分）。画面で変えられる
+// 予備試験は1科目70分（法律実務基礎科目は民事・刑事で3時間＝各90分）。
+// v32.2〜：解く時間の選択肢は「40分・45分・その他（入力）」。「その他」を選んだとき、入力欄の最初の値にこの目安を入れる
 function examDocsDefaultMinutes(examType, subject) {
   if (examType === '予備試験') return (subject === '実務基礎民事' || subject === '実務基礎刑事') ? 90 : 70;
   return subject === '労働法' ? 180 : 120;
 }
-const EXAM_DOCS_MINUTE_CHOICES = [30, 45, 60, 70, 90, 120, 150, 180];
+const EXAM_DOCS_MINUTE_PRESETS = [40, 45];
+const EXAM_DOCS_MINUTES_MAX = 600;
+// 入力された時間（分）を整数にする。1〜600の範囲外・数でないときは null
+function examDocsParseMinutes(v) {
+  const n = Math.floor(Number(String(v == null ? '' : v).normalize('NFKC').replace(/[^\d.]/g, '') || NaN));
+  return n >= 1 && n <= EXAM_DOCS_MINUTES_MAX ? n : null;
+}
+// 解く時間（分）：最後に選んだ値（この端末だけ）。まだ選んでいなければ40分
+function examDocsPracticeMinutes() {
+  const m = loadExamDocsView().minutes;
+  return m >= 1 ? m : EXAM_DOCS_MINUTE_PRESETS[0];
+}
 function loadExamPractice() {
   try {
     const v = JSON.parse(localStorage.getItem(EXAM_PRACTICE_KEY) || 'null');
@@ -245,12 +257,13 @@ function examDocsFormatRemaining(ms) {
 
 // --- 表示の好み（この端末だけ）：並べ方・色分け・絞り込み ---
 function loadExamDocsView() {
-  const d = { layout: 'tabs', hl: true, filter: 'all' };
+  const d = { layout: 'tabs', hl: true, filter: 'all', minutes: EXAM_DOCS_MINUTE_PRESETS[0] };
   try {
     const v = JSON.parse(localStorage.getItem(EXAM_DOCS_VIEW_KEY) || '{}');
     if (v && (v.layout === 'tabs' || v.layout === 'side')) d.layout = v.layout;
     if (v && typeof v.hl === 'boolean') d.hl = v.hl;
     if (v && (v.filter === 'all' || v.filter === 'bad' || v.filter === 'good')) d.filter = v.filter;
+    if (v && Number.isInteger(v.minutes) && v.minutes >= 1 && v.minutes <= EXAM_DOCS_MINUTES_MAX) d.minutes = v.minutes;
   } catch (e) {}
   return d;
 }
@@ -432,11 +445,14 @@ function examDocsPracticeBarHtml(st, docAvailable) {
       + '</div>';
   }
   if (!docAvailable) return '';
-  const def = examDocsDefaultMinutes(st.examType, st.subject);
-  const choices = EXAM_DOCS_MINUTE_CHOICES.includes(def) ? EXAM_DOCS_MINUTE_CHOICES : EXAM_DOCS_MINUTE_CHOICES.concat([def]).sort((a, b) => a - b);
+  const cur = examDocsPracticeMinutes();
+  const isOther = !EXAM_DOCS_MINUTE_PRESETS.includes(cur);
   return '<div class="examDocPractice">'
     + '<button type="button" class="stackBtn examDocStartBtn" data-act="practiceStart">✍ 時間を計って解く</button>'
-    + '<select id="examDocMinutes" aria-label="制限時間">' + choices.map(m => '<option value="' + m + '"' + (m === def ? ' selected' : '') + '>' + m + '分</option>').join('') + '</select>'
+    + '<select id="examDocMinutes" data-act="selMinutes" aria-label="制限時間">'
+    + EXAM_DOCS_MINUTE_PRESETS.map(m => '<option value="' + m + '"' + (m === cur ? ' selected' : '') + '>' + m + '分</option>').join('')
+    + '<option value="other"' + (isOther ? ' selected' : '') + '>その他（入力する）</option></select>'
+    + (isOther ? '<span class="examDocMinutesOther"><input type="number" id="examDocMinutesOther" data-act="minutesOther" min="1" max="' + EXAM_DOCS_MINUTES_MAX + '" step="1" inputmode="numeric" value="' + cur + '" aria-label="制限時間（分）"> 分</span>' : '')
     + '<span class="examDocPracticeHint">解き終えるまで出題趣旨・採点実感は閉じておきます</span>'
     + '</div>';
 }
@@ -573,7 +589,14 @@ async function renderExamDocs() {
     html += examDocsPanelHtml(st, data, k, view, readMap, locked && k.id !== 'mondai');
   }
   html += examDocsRelatedHtml(st);
+  // 1列で読むときは、横に長くならないよう幅をおさえて中央に置く（v32.2）
+  if (!side) html = '<div class="examDocReadCol">' + html + '</div>';
   els.view.innerHTML = html;
+  if (st.focusMinutes) {
+    st.focusMinutes = false;
+    const inp = document.getElementById('examDocMinutesOther');
+    if (inp && inp.focus) { try { inp.focus(); inp.select(); } catch (e) {} }
+  }
   els.view.dataset.renderedFor = examDocsRenderKey();
   if (prevScroll) examDocsRestoreScrolls(els.view, prevScroll);
   examDocsUpdateTimer();
@@ -699,6 +722,11 @@ function closeExamDocSheet() {
 }
 
 // --- 解答の開始・終了 ---
+function examDocsSaveMinutes(m) {
+  const v = loadExamDocsView();
+  v.minutes = m;
+  saveExamDocsView(v);
+}
 function examDocsStartPractice(minutes) {
   const st = examDocsState;
   const m = Number(minutes) || examDocsDefaultMinutes(st.examType, st.subject);
@@ -809,8 +837,20 @@ function examDocsHandleAction(el, evt) {
     return;
   }
   if (act === 'practiceStart') {
+    // 入力欄の値をそのまま使う（入力してすぐ「解く」を押しても、入力が反映されるように）
     const sel = document.getElementById('examDocMinutes');
-    examDocsStartPractice(sel ? sel.value : null);
+    let mins = examDocsPracticeMinutes();
+    if (sel && sel.value === 'other') {
+      const inp = document.getElementById('examDocMinutesOther');
+      mins = examDocsParseMinutes(inp ? inp.value : '');
+      if (mins == null) {
+        st.message = '解く時間は、1〜' + EXAM_DOCS_MINUTES_MAX + '分の数で入力してください。';
+        renderExamDocs();
+        return;
+      }
+      examDocsSaveMinutes(mins);
+    }
+    examDocsStartPractice(mins);
     renderExamDocs();
     return;
   }
@@ -844,7 +884,7 @@ function examDocsHandleAction(el, evt) {
     const p = loadExamPractice();
     openExamDocs({ examType: el.dataset.exam, year: Number(el.dataset.year), subject: el.dataset.subj, kind: 'mondai' });
     if (!p) {
-      examDocsStartPractice(examDocsDefaultMinutes(el.dataset.exam, el.dataset.subj));
+      examDocsStartPractice(examDocsPracticeMinutes());
       renderExamDocs();
     }
   }
@@ -860,6 +900,24 @@ function examDocsHandleChange(el) {
     if (!examDocsSubjectApplies(st.examType, st.subject, st.year)) st.subject = '憲法';
   } else if (act === 'selSubj') {
     st.subject = el.value;
+  } else if (act === 'selMinutes') {
+    if (el.value === 'other') {
+      // 「その他」に切り替えたら、入力欄には試験時間の目安（70・90・120・180分）を入れる
+      const cur = examDocsPracticeMinutes();
+      examDocsSaveMinutes(EXAM_DOCS_MINUTE_PRESETS.includes(cur) ? examDocsDefaultMinutes(st.examType, st.subject) : cur);
+      st.focusMinutes = true;
+    } else {
+      examDocsSaveMinutes(Number(el.value));
+    }
+    st.message = '';
+    renderExamDocs();
+    return;
+  } else if (act === 'minutesOther') {
+    // 入力の途中で描き直さない（打っている最中に消えないように）。使えない値（0・空・601以上など）は
+    // 保存せず入力欄にも手を入れない（「解く」を押したときに知らせる。黙って前の値に戻して始めてしまわないように）
+    const m = examDocsParseMinutes(el.value);
+    if (m != null) { el.value = m; examDocsSaveMinutes(m); }
+    return;
   } else if (act === 'toggleHl') {
     const v = loadExamDocsView();
     v.hl = !!el.checked;
@@ -888,7 +946,7 @@ function initExamDocsFeature() {
     // 条文リンクは document の委任リスナーに任せる（ここでは止めない）
     if (e.target.closest('.lawRef')) return;
     const el = e.target.closest('[data-act]');
-    if (!el || el.tagName === 'SELECT' || (el.tagName === 'INPUT' && el.type === 'checkbox')) return;
+    if (!el || el.tagName === 'SELECT' || el.tagName === 'INPUT') return;
     examDocsHandleAction(el, e);
   });
   els.view.addEventListener('change', (e) => {

@@ -2176,8 +2176,14 @@ html { scrollbar-gutter: stable; }
 .examDocSheetBtn-shushi { color: var(--exam-s); }
 .examDocSheetBtn-jikkan { color: var(--exam-k); }
 .examDocSheetNote { font-size: 12px; color: var(--text-secondary); }
+/* 1列で読むときの幅（v32.2）：パソコンの横長の画面でも、1行が約40字に収まるようにして中央に置く */
+.examDocReadCol { max-width: 700px; margin: 0 auto; }
+.examDocReadCol .examDocBody { font-size: 16px; line-height: 2; }
+.examDocMinutesOther { display: inline-flex; align-items: center; gap: 4px; }
+.examDocMinutesOther input { width: 5em; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--border-strong); font-size: 14px; }
 @media (max-width: 640px) {
   .examDocView { padding: 12px 10px; }
+  .examDocReadCol .examDocBody { font-size: 15.5px; line-height: 1.9; }
   .examDocKindTab { font-size: 13px; padding: 6px 9px; }
   .examDocBody { font-size: 15.5px; }
   .examDocTimer { font-size: 19px; }
