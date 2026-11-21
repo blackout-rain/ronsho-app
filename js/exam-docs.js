@@ -933,7 +933,10 @@ function initExamDocsFeature() {
       try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {}
       openExamDocSheet(examDocsExamTypeDefault(), { era: td.dataset.yearEra, num: Number(td.dataset.yearNum) }, td.dataset.subj);
     };
+    // マウス・ペン：pointer イベント。指（タッチ）は下の touch イベントで見る。
+    // iPad(Safari) は指の長押しの途中で pointercancel を出してしまい、長押しが途切れていたため（v32.1）
     wrap.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch') return;
       const td = cellOf(e.target);
       if (!td || (e.pointerType === 'mouse' && e.button !== 0)) return;
       startX = e.clientX; startY = e.clientY;
@@ -941,9 +944,35 @@ function initExamDocsFeature() {
       pressTimer = setTimeout(() => { pressTimer = null; fire(td); }, 550);
     });
     wrap.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'touch') return;
       if (pressTimer && (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10)) cancel();
     });
-    ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => wrap.addEventListener(t, cancel));
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => wrap.addEventListener(t, (e) => {
+      if (e.pointerType === 'touch') return;
+      cancel();
+    }));
+    // 指：touchcancel では止めない（iPad が長押しで出すことがあるため）。
+    // 指が動いた・離した・表や画面がスクロールしたときだけ取り消す
+    let touchFired = false;
+    wrap.addEventListener('touchstart', (e) => {
+      touchFired = false;
+      const td = cellOf(e.target);
+      if (!td || !e.touches || e.touches.length !== 1) { cancel(); return; }
+      startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+      cancel();
+      pressTimer = setTimeout(() => { pressTimer = null; touchFired = true; fire(td); }, 550);
+    }, { passive: true });
+    wrap.addEventListener('touchmove', (e) => {
+      const t = e.touches && e.touches[0];
+      if (pressTimer && t && (Math.abs(t.clientX - startX) > 10 || Math.abs(t.clientY - startY) > 10)) cancel();
+    }, { passive: true });
+    wrap.addEventListener('touchend', (e) => {
+      cancel();
+      // 長押しが効いたあと、指を離したときの click（＝記録）を出させない
+      if (touchFired && e.cancelable) e.preventDefault();
+      touchFired = false;
+    });
+    if (document.addEventListener) document.addEventListener('scroll', cancel, true);
     wrap.addEventListener('contextmenu', (e) => {
       const td = cellOf(e.target);
       if (!td) return;
