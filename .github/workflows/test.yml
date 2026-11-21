@@ -22,3 +22,5 @@ jobs:
         run: node tools/sync-test/run.js
       - name: Word解析・条文参照・キー登録漏れのテスト
         run: node tools/unit-test/run.js
+      - name: 過去問の資料の作り方（段落のつなぎ直し）のテスト
+        run: python3 tools/exam-fetch/test_paragraphs.py
