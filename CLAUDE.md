@@ -46,6 +46,7 @@
 - 文のデータは `data/exam/*.json`（年度ごと）と `data/exam/index.json`（一覧・rev）。**法務省のPDFから `tools/exam-fetch/build.py` で作る**（`python3 tools/exam-fetch/build.py <PDFを置くフォルダ>`）。取得する資料のURLは `tools/exam-fetch/sources.json` に手で並べてある。新しい年度・新しく公表された資料（出題趣旨・採点実感）は、ここにURLを足して作り直す。
   - 法務省のサイトは curl の既定の名乗りを断る（403）。build.py は `exam-pdf-fetcher/1.0` と正直に名乗り、2秒ずつ間を空けて取得する。ブラウザのふりはしないこと。
   - 日本語のPDFの一部は poppler-data が無いと文が取れない（`apt-get install poppler-data`）。
+  - 行の組み立ては `pdftotext -bbox-layout`（座標つき）で、同じ高さの語を左から順につなぐ（`-layout` は「 や 【 の前後で1行を別々の行にしてしまい、段落が途中で切れていた＝v32.3で修正）。段落のつなぎ直し（`to_paragraphs`）を変えたら `python3 tools/exam-fetch/test_paragraphs.py` を実行する（CIでも実行）。
   - 出典：法務省ウェブサイト（公共データ利用規約 PDL1.0）。各資料に元のページ・PDFのURLを持たせ、画面に「法務省ウェブサイト（…）を加工して作成」と出している。この表示は消さないこと。
   - 作り直したら `node tools/unit-test/run.js` を実行する（rev と中身の一致、科目のそろい方、ページ番号の消し残りなどを確かめる）。
 - アプリは開いた年度のファイルだけ取得し、IndexedDB `ronshoExamDocsDB` に控えを残す（rev が変わったら取り直す。オフラインでは古い控えでも見せる）。再取得できるので同期・バックアップの対象外。

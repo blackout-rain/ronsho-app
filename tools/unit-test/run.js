@@ -622,6 +622,18 @@ console.log('\n■ 過去問の資料：データ（data/exam/*.json）');
   eq('予備試験 令和元〜7年：問題・出題趣旨がそろう（労働法は令和4年から）', yobiMissing, []);
   const yobiJikkan = Object.keys(files).filter(f => f.startsWith('yobi')).filter(f => Object.values(files[f].subjects).some(x => x.jikkan));
   eq('予備試験には採点実感が無い（公表されていない）', yobiJikkan, []);
+  // 段落が行の途中の断片で切れていない（v32.3。PDFの1行が「 」【 などの前後で別の行として抜き出され、段落が切れていた）
+  const broken = [];
+  Object.keys(files).forEach(f => Object.keys(files[f].subjects).forEach(subj => Object.keys(files[f].subjects[subj]).forEach(kind => {
+    files[f].subjects[subj][kind].paras.forEach((p, i, a) => {
+      if (/[、，]$/.test(p)) broken.push(f + ' ' + subj + ' ' + kind + '：読点で終わる段落「…' + p.slice(-12) + '」');
+      if (/^[）」』】〕］〉》、。，．)]/.test(p)) broken.push(f + ' ' + subj + ' ' + kind + '：閉じ括弧・句読点で始まる段落「' + p.slice(0, 12) + '…」');
+    });
+  })));
+  eq('読点で終わる段落・閉じ括弧で始まる段落が無い（文の途中で段落が切れていない）', broken.slice(0, 5), []);
+  const jikou = files['shiho-R8.json'].subjects['民法'].shushi.paras;
+  check('令和8年 民法 出題趣旨の「時効取得と登記」の文が切れずにつながる',
+    jikou.some(p => p.includes('この点は、「時効取得と登記」として古くから論じられている問題であり')) && jikou.some(p => p.includes('という。）であるかによって問題を区別する')));
   const r7 = files['shiho-R7.json'];
   check('問題文の段落が文の途中で切れていない（令和7年 憲法の1段落目）', /。$/.test(r7.subjects['憲法'].mondai.paras[1]), r7.subjects['憲法'].mondai.paras[1]);
   check('ぶら下げの箇条書き（○…）を1段落にまとめる', r7.subjects['行政法'].jikkan.paras.some(p => /^○　行政事件訴訟法.*判断した。$/.test(p)));

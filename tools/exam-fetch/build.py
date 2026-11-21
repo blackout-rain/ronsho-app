@@ -64,21 +64,71 @@ def fetch(url, dest):
         f.write(data)
 
 
+WORD_RE = re.compile(r'<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">(.*?)</word>', re.S)
+
+
+def unescape(t):
+    return (t.replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"')
+             .replace('&apos;', "'").replace('&amp;', '&'))
+
+
+def median(xs):
+    xs = sorted(xs)
+    return xs[len(xs) // 2]
+
+
 def pdf_lines(path):
-    out = subprocess.run(['pdftotext', '-layout', path, '-'], capture_output=True)
-    text = out.stdout.decode('utf-8', 'replace')
+    """PDFの文を、見た目の1行ずつの文字列にして返す。
+    pdftotext -layout は、行の途中の「 」【 などの前後を別々の行として抜き出すことがあり
+    （例：「…見せながら、」「あ」／「んた、これ好きでしょ。」「」などと…」）、そこで段落が切れていた。
+    そこで座標つき（-bbox-layout）で語を取り、同じ高さ（y）の語を左から順につないで1行にする。
+    行頭の字下げは、半角1字ぶん（文字の高さの半分）を単位にした空白の数で表す。
+    ページの変わり目と、行の間隔が広く空いたところ（段落の間）には空行を入れる。"""
+    out = subprocess.run(['pdftotext', '-bbox-layout', path, '-'], capture_output=True)
+    xml = out.stdout.decode('utf-8', 'replace')
     lines = []
-    for raw in text.replace('\f', '\n').split('\n'):
-        l = raw.rstrip()
-        s = l.strip()
-        # ページ番号（「- 1 -」「－１－」）と、ページごとに入る問題集の見出し
-        if re.fullmatch(r'[-－‐]?\s*[0-9０-９]+\s*[-－‐]|[-－‐]\s*[0-9０-９]+', s):
+    for page in xml.split('<page ')[1:]:
+        words = [(float(m.group(1)), float(m.group(2)), float(m.group(3)), float(m.group(4)), unescape(m.group(5)))
+                 for m in WORD_RE.finditer(page)]
+        if not words:
+            lines.append('')
             continue
-        if re.fullmatch(r'[0-9０-９]+', s):
-            continue
-        if re.fullmatch(r'論文式試験問題集［[^］]*］', s):
-            continue
-        lines.append(l)
+        em = median([w[3] - w[1] for w in words]) or 10.0
+        cell = em / 2.0
+        words.sort(key=lambda w: (w[1], w[0]))
+        rows = []
+        for w in words:
+            # 同じ高さ（文字の高さの4割以内）なら同じ行。行の中では左から順
+            if rows and abs(w[1] - rows[-1][0]) < em * 0.4:
+                rows[-1][1].append(w)
+            else:
+                rows.append([w[1], [w]])
+        pitches = [rows[i + 1][0] - rows[i][0] for i in range(len(rows) - 1)]
+        pitch = median(pitches) if pitches else em * 1.5
+        prev_y = None
+        for y, ws in rows:
+            ws.sort(key=lambda w: w[0])
+            text = ''
+            last_x = None
+            for w in ws:
+                if last_x is not None and w[0] - last_x > em * 0.3:
+                    # 文字1つぶん（番号・○のあとの字下げなど）なら全角の空白、それより狭ければ半角
+                    text += '　' if w[0] - last_x > em * 0.7 else ' '
+                text += w[4]
+                last_x = max(last_x, w[2]) if last_x is not None else w[2]
+            s = text.strip()
+            if prev_y is not None and y - prev_y > pitch * 1.25:
+                lines.append('')
+            prev_y = y
+            # ページ番号（「- 1 -」「－１－」）と、ページごとに入る問題集の見出し
+            if re.fullmatch(r'[-－‐]?\s*[0-9０-９]+\s*[-－‐]|[-－‐]\s*[0-9０-９]+', s):
+                continue
+            if re.fullmatch(r'[0-9０-９]+', s):
+                continue
+            if re.fullmatch(r'論文式試験問題集［[^］]*］', s):
+                continue
+            lines.append(' ' * int(round(ws[0][0] / cell)) + s)
+        lines.append('')
     return lines
 
 
@@ -105,8 +155,15 @@ def indent_of(l):
 NEW_PARA = re.compile(
     r'^(〔|【|［|\[|（出題の趣旨）|（趣旨）|・|○|●|◯|※|'
     r'[0-9０-９]+[\s　．.、)）]|[⑴-⒇①-⑳]|[(（][0-9０-９ア-ンa-zａ-ｚⅰ-ⅹ]+[)）]|'
-    r'[ア-ン][\s　．.、)）]|第[0-9０-９一二三四五六七八九十]+[\s　])')
+    r'[ア-ン][\s　．.、)）]|[一二三四五六七八九十]+[\s　]|第[0-9０-９一二三四五六七八九十]+[\s　]|'
+    r'[Ａ-Ｚ甲乙丙丁][０-９]*[：:])')  # 最後は対話形式の話者（「Ｐ：」「Ｌ１：」）
 SENTENCE_END = re.compile(r'[。」）)：:】〕］]$')
+# 行頭がこれなら、前の行の続き（助詞・語尾で始まる段落はないので、前の行が右端まで届いていなくても続きにする。
+# 例：「…転倒させる暴行を加え」「たものである。」。見出し・箇条書きの項目と区別するため、前の段落が短いときは使わない）
+FRAGMENT_START = re.compile(
+    r'^(が|を|は|に|も|で|と|の|や|か|て|から|まで|より|ため|ており|ている|ていた|いる|いた|います|いま|'
+    r'たもの|たこと|たが|た。|た、|った|する(?!と)|され|させ|して|しな|し、|し。)')
+FRAGMENT_MIN_LEN = 8
 # 行頭にあれば、前の行の続き（PDF上は同じ行なのに、ぶら下げの閉じ括弧などが別の行として抜き出される）
 CLOSING_HEAD = re.compile(r'^[）」』】〕］〉》、。，．,.)\]]')
 # 行末にあれば、文の途中（読点で段落は終わらない）
@@ -137,20 +194,29 @@ def to_paragraphs(lines):
     prev_full = False
     prev_end = True
     prev_comma = False
+    gap = False
     cont_indent = None  # 段落の2行目の字下げ（まだ1行だけなら None）
     first_indent = 0
     for l in lines:
         s = l.strip()
         if not s:
-            # 空行（ページの変わり目を含む）。前の行が文の途中で一杯まで来ていれば、
-            # ページをまたいで続く文なので段落を閉じない
-            if cur is not None and not (not prev_end and (prev_full or prev_comma)):
+            # 空行（ページの変わり目・行の間隔が広いところ）。すぐには段落を閉じず、次の行を見て決める
+            gap = True
+            continue
+        if gap:
+            gap = False
+            # 前の行が文の途中で一杯まで来ていれば、ページをまたいで続く文なので段落を閉じない。
+            # 次の行が助詞・語尾で始まるときも続き
+            frag = (cur is not None and not prev_end and len(cur) >= FRAGMENT_MIN_LEN
+                    and FRAGMENT_START.match(s) and not NEW_PARA.match(s))
+            if cur is not None and not (not prev_end and (prev_full or prev_comma)) and not frag:
                 paras.append(cur)
                 cur = None
                 prev_full = False
                 prev_end = True
                 prev_comma = False
-            continue
+            elif frag and not (prev_full or prev_comma):
+                prev_full = True  # 続きとして扱う（下の判定で段落を始めないように）
         ind = indent_of(l)
         s = re.sub(r'[ 　]{2,}', '　', s)
         if cur is not None and CLOSING_HEAD.match(s):
@@ -160,12 +226,14 @@ def to_paragraphs(lines):
             prev_end = SENTENCE_END.search(s) is not None
             prev_comma = COMMA_END.search(s) is not None
             continue
-        if cur is not None and prev_comma:
+        after_comma = cur is not None and prev_comma
+        if after_comma:
             # 読点（、）で終わる行は文の途中。「この点は、」のあとに別の行として抜き出された
             # 続き（字下げが大きい・前の行が短い）も、同じ段落の続きにする
             starts_new = False
         elif cur is None or not prev_full:
-            starts_new = True
+            starts_new = not (cur is not None and not prev_end and len(cur) >= FRAGMENT_MIN_LEN
+                              and FRAGMENT_START.match(s) and not NEW_PARA.match(s))
         elif prev_end and NEW_PARA.match(s):
             starts_new = True
         elif cont_indent is not None and ind > cont_indent + 1:
@@ -182,7 +250,9 @@ def to_paragraphs(lines):
             cont_indent = None
         else:
             cur += s
-            if cont_indent is None:
+            # 読点のあとに続けた行は、字下げの基準（段落の2行目）にしない
+            # （別の行として抜き出された断片は、字下げが本来の2行目と違うことがあるため）
+            if cont_indent is None and not after_comma:
                 cont_indent = ind
         prev_end = SENTENCE_END.search(s) is not None
         prev_comma = COMMA_END.search(s) is not None
