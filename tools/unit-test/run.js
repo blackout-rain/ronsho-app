@@ -705,7 +705,25 @@ console.log('\n■ 過去問の資料：表示・色分け・読んだ印・論�
   eq('解答中でなければ何もしない', ex('examDocsFinishPractice()'), '');
   ex('localStorage.setItem("ronshoExamPracticeV1", "{壊れた")');
   eq('壊れた解答中の値は無視する', ex('loadExamPractice()'), null);
-  eq('表示の好みの既定値', ex('loadExamDocsView()'), { layout: 'tabs', hl: true, filter: 'all' });
+  eq('表示の好みの既定値（解く時間は40分）', ex('loadExamDocsView()'), { layout: 'tabs', hl: true, filter: 'all', minutes: 40 });
+  // 解く時間：40分・45分・その他（入力する）（v32.2）
+  eq('解く時間の選択肢は40分と45分', ex('EXAM_DOCS_MINUTE_PRESETS'), [40, 45]);
+  eq('まだ選んでいなければ40分', ex('examDocsPracticeMinutes()'), 40);
+  const parseMin = ex('examDocsParseMinutes');
+  eq('入力した時間の読み取り（全角の数字も可）', [parseMin('50'), parseMin('５５'), parseMin(' 90分 '), parseMin('600')], [50, 55, 90, 600]);
+  eq('時間として使えない入力は null（0・空・文字・601以上）', [parseMin('0'), parseMin(''), parseMin('あ'), parseMin('601'), parseMin(null)], [null, null, null, null, null]);
+  ex('examDocsSaveMinutes(55)');
+  eq('「その他」で入れた時間を次回も使う', ex('examDocsPracticeMinutes()'), 55);
+  ex('localStorage.setItem("ronshoExamDocsViewV1", JSON.stringify({ minutes: 9999 }))');
+  eq('範囲外の保存値は40分に戻す', ex('examDocsPracticeMinutes()'), 40);
+  ex('localStorage.setItem("ronshoExamDocsViewV1", JSON.stringify({ minutes: 1.5 }))');
+  eq('小数の保存値は40分に戻す', ex('examDocsPracticeMinutes()'), 40);
+  ex('localStorage.removeItem("ronshoExamDocsViewV1")');
+  {
+    const css = read('style.css');
+    check('1列で読むときは幅をおさえて中央に置く', /\.examDocReadCol \{[^}]*max-width: 700px[^}]*margin: 0 auto/.test(css));
+    check('3列で並べるときは幅をおさえない（読む列の中に入れない）', /if \(!side\) html = '<div class="examDocReadCol">'/.test(read('js/exam-docs.js')));
+  }
   eq('ファイル名', [ex('examDocsFileName("新司法試験", 7)'), ex('examDocsFileName("予備試験", 1)')], ['shiho-R7.json', 'yobi-R1.json']);
   eq('科目があるか（予備試験の労働法は令和4年から、実務基礎は予備試験だけ）',
     [ex('examDocsSubjectApplies("予備試験", "労働法", 3)'), ex('examDocsSubjectApplies("予備試験", "労働法", 4)'), ex('examDocsSubjectApplies("新司法試験", "実務基礎民事", 7)')], [false, true, false]);
