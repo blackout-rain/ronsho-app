@@ -246,6 +246,8 @@ function restoreFromBackupPayload(data) {
   if (data.quizDefaultFilters && typeof data.quizDefaultFilters === 'object') localStorage.setItem('ronshoQuizDefaultFiltersV1', JSON.stringify(data.quizDefaultFilters));
   if (data.tabShortcuts && typeof data.tabShortcuts === 'object') localStorage.setItem('ronshoTabShortcutsV1', JSON.stringify(data.tabShortcuts));
   if (Array.isArray(data.syncConflicts)) localStorage.setItem('ronshoSyncConflictsV1', JSON.stringify(data.syncConflicts));
+  // 過去問の資料の「読んだ」印（v32.0〜）。古いバックアップには無いので、そのときは今の印を残す
+  if (data.examRead && typeof data.examRead === 'object' && !Array.isArray(data.examRead)) localStorage.setItem('ronshoExamReadV1', JSON.stringify(data.examRead));
   if (entries.length > 0) {
     downloadBtn.style.display = 'inline-block';
     downloadLogBtn.style.display = 'inline-block';

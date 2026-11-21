@@ -40,6 +40,19 @@
   - XMLの解析関数は firstChild / nextSibling / nodeType / tagName / nodeValue / getAttribute だけを使う（Nodeのテストで小さなXML読み取り器を渡して検証するため）。ルビの読み（Rt）は捨て、整形用の改行は取り除く。
 - 条文リンクのクリックは document の委任リスナーで拾う。本文欄・空欄などのクリック処理で `stopPropagation()` する場合は、**`.lawRef` かどうかの判定を `stopPropagation()` より前に**置くこと（後に置くと条文が開かなくなる。v31.0で論証一覧・問題演習の空欄の不具合を修正済み）。
 
+## 過去問の資料（js/exam-docs.js、v32.0〜）
+
+- 「📝 過去問ログ」タブで、司法試験・予備試験の**令和の論文式**の問題・出題趣旨・採点実感を、年度・科目ごとに読める（予備試験は採点実感が公表されていない）。科目は過去問ログの表と同じ10科目（選択科目は労働法だけ）。
+- 文のデータは `data/exam/*.json`（年度ごと）と `data/exam/index.json`（一覧・rev）。**法務省のPDFから `tools/exam-fetch/build.py` で作る**（`python3 tools/exam-fetch/build.py <PDFを置くフォルダ>`）。取得する資料のURLは `tools/exam-fetch/sources.json` に手で並べてある。新しい年度・新しく公表された資料（出題趣旨・採点実感）は、ここにURLを足して作り直す。
+  - 法務省のサイトは curl の既定の名乗りを断る（403）。build.py は `exam-pdf-fetcher/1.0` と正直に名乗り、2秒ずつ間を空けて取得する。ブラウザのふりはしないこと。
+  - 日本語のPDFの一部は poppler-data が無いと文が取れない（`apt-get install poppler-data`）。
+  - 出典：法務省ウェブサイト（公共データ利用規約 PDL1.0）。各資料に元のページ・PDFのURLを持たせ、画面に「法務省ウェブサイト（…）を加工して作成」と出している。この表示は消さないこと。
+  - 作り直したら `node tools/unit-test/run.js` を実行する（rev と中身の一致、科目のそろい方、ページ番号の消し残りなどを確かめる）。
+- アプリは開いた年度のファイルだけ取得し、IndexedDB `ronshoExamDocsDB` に控えを残す（rev が変わったら取り直す。オフラインでは古い控えでも見せる）。再取得できるので同期・バックアップの対象外。
+- 「読んだ」印 `ronshoExamReadV1` は同期・バックアップ対象。解答中のタイマー `ronshoExamPracticeV1` と表示の好み `ronshoExamDocsViewV1` は端末固有。
+- 表のマスの長押しは、`js/exam-docs.js` が捕捉段階の click で止める（past-exam.js の「マスを押したら記録」より先に効かせるため）。
+- 条文リンクは法律名つきの参照だけに付ける（`linkifyLawRefs(html, null)`）。試験の文には「本件条例第３２条」のような架空の法令が多いため。
+
 # クラウド同期の仕組み（drive-sync.js）
 
 - 同期用バックエンドは、Google Apps Script（GAS）のウェブアプリ（`drive-sync.js`内の`SYNC_URL`）。GETで現在の全データ(JSON)を取得、POSTでrevision番号ベースの楽観ロックにより丸ごと上書き保存する。マージ・競合解決はすべてクライアント側（`drive-sync.js`）で行う。

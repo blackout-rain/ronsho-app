@@ -33,6 +33,12 @@ html {
   --btn-grad-2: rgba(230,242,255,0.94);
   --btn-grad-1-hover: rgba(255,255,255,1);
   --btn-grad-2-hover: rgba(214,235,255,0.98);
+  /* 過去問の資料（js/exam-docs.js）：採点実感の色分けと、問題・趣旨・実感の色 */
+  --exam-good-bg: #c9f0d9;
+  --exam-bad-bg: #ffd9d2;
+  --exam-q: #1d5fd1;
+  --exam-s: #0f8a6a;
+  --exam-k: #b4570f;
   color-scheme: light;
 }
 /* 端末の設定に「⚙️その他」タブでの明示的な選択(data-theme)が無い場合のみ、
@@ -68,6 +74,11 @@ html {
     --btn-grad-2: rgba(34,49,77,0.94);
     --btn-grad-1-hover: rgba(30,42,66,1);
     --btn-grad-2-hover: rgba(43,60,92,0.98);
+    --exam-good-bg: #1d4a35;
+    --exam-bad-bg: #5a2a22;
+    --exam-q: #7fb0ff;
+    --exam-s: #4fd1aa;
+    --exam-k: #f0a160;
     color-scheme: dark;
   }
 }
@@ -101,6 +112,11 @@ html {
   --btn-grad-2: rgba(34,49,77,0.94);
   --btn-grad-1-hover: rgba(30,42,66,1);
   --btn-grad-2-hover: rgba(43,60,92,0.98);
+  --exam-good-bg: #1d4a35;
+  --exam-bad-bg: #5a2a22;
+  --exam-q: #7fb0ff;
+  --exam-s: #4fd1aa;
+  --exam-k: #f0a160;
   color-scheme: dark;
 }
 /* OSやアプリ側でダークが選ばれている時、独自スタイルの無いinput/select/textarea
@@ -2028,3 +2044,140 @@ html { scrollbar-gutter: stable; }
 .lawStockCard { border-color: var(--border, #dbe4f0); }
 .lawReadArea mark, .lawStockSnippet mark { background: rgba(255, 213, 79, 0.55); color: inherit; border-radius: 2px; }
 /* ▲▲▲ 全条ダウンロード・全条を読む ここまで ▲▲▲ */
+
+/* ▼▼▼ 過去問の資料（問題・出題趣旨・採点実感）js/exam-docs.js v32.0 ▼▼▼ */
+.pastMatrixLegendHint { flex-basis: 100%; font-size: 11px; color: var(--text-secondary); }
+.pastMatrixCell { -webkit-touch-callout: none; }
+.pastMatrixTabBtn.examDocOpenBtn { margin-left: auto; }
+.pastMatrixTabBtn.examDocOpenBtnRun { background: #b4570f; border-color: #b4570f; color: #fff; }
+/* 読む画面を開いている間は、表・ランキングを隠して読むことに集中する */
+#pastExamPage.examDocsOpen > .pastMatrixCard, #pastExamPage.examDocsOpen > .examTrendCard { display: none; }
+.examDocView:empty { display: none; }
+.examDocView {
+  background: var(--card-bg); border: 1px solid #dbe6f2; border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 12px; color: var(--text);
+}
+.examDocHeader { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.examDocHeader select { padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border-strong); font-size: 14px; }
+.examDocHeaderTitle { font-size: 15px; font-weight: 800; }
+.examDocLoading, .examDocEmpty, .examDocError, .examDocLocked { padding: 18px 8px; color: var(--text-secondary); font-size: 13.5px; line-height: 1.7; }
+.examDocError { color: #b42318; }
+.examDocLocked { text-align: center; border: 2px dashed var(--border-strong); border-radius: 10px; font-weight: 700; }
+.examDocMessage { background: var(--tint-6); border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-bottom: 8px; }
+.examDocKindTabs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; border-bottom: 2px solid var(--border); margin-bottom: 10px; }
+.examDocKindTab {
+  border: none; background: transparent; color: var(--text-secondary); font-weight: 700; font-size: 14px;
+  padding: 7px 14px; border-radius: 8px 8px 0 0; cursor: pointer; box-shadow: none;
+}
+.examDocKindTab.active[data-kind="mondai"] { background: var(--tint-12); color: var(--exam-q); }
+.examDocKindTab.active[data-kind="shushi"] { background: var(--tint-12); color: var(--exam-s); }
+.examDocKindTab.active[data-kind="jikkan"] { background: var(--tint-12); color: var(--exam-k); }
+.examDocKindTab.missing { opacity: 0.55; }
+.examDocLayoutBtn { margin-left: auto; font-size: 12px; padding: 5px 10px; border-radius: 999px; }
+.examDocSide { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.examDocSide .examDocPanel { max-height: 78vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+.examDocPanel { min-width: 0; }
+.examDocPanelHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+.examDocPanelTitle { font-weight: 800; font-size: 14px; }
+.examDocPanel[data-kind="mondai"] .examDocPanelTitle { color: var(--exam-q); }
+.examDocPanel[data-kind="shushi"] .examDocPanelTitle { color: var(--exam-s); }
+.examDocPanel[data-kind="jikkan"] .examDocPanelTitle { color: var(--exam-k); }
+.examDocBody { font-size: 15px; line-height: 1.9; overflow-wrap: anywhere; }
+.examDocBody p { margin: 0 0 0.7em; text-indent: 0; }
+.examDocBody p.examDocH { font-weight: 800; margin-top: 1.1em; color: var(--text-secondary2); }
+.examDocPanelFoot { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 10px; display: grid; gap: 8px; }
+.examReadBtn {
+  justify-self: start; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 999px;
+  border: 1px solid var(--border-strong); background: var(--card-bg); color: var(--text-secondary); cursor: pointer; box-shadow: none;
+}
+.examReadBtn.on { background: #0f8a6a; border-color: #0f8a6a; color: #fff; }
+.examDocSource { font-size: 11.5px; color: var(--text-secondary); line-height: 1.6; }
+.examDocSource a { color: inherit; }
+.examDocSourceNote { margin-top: 2px; }
+.examHlBar { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 12px; margin-bottom: 8px; padding: 6px 8px; background: var(--tint-6); border-radius: 8px; }
+.examHlToggle { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; }
+.examHlFilters { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.examHlFilterBtn { font-size: 11.5px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--card-bg); color: var(--text-secondary); cursor: pointer; box-shadow: none; }
+.examHlFilterBtn.active { background: #0057e7; border-color: #0057e7; color: #fff; }
+.examHlNote { color: var(--text-secondary); font-size: 11px; }
+.examHlGood { background: var(--exam-good-bg); border-radius: 3px; padding: 0 1px; }
+.examHlBad { background: var(--exam-bad-bg); border-radius: 3px; padding: 0 1px; }
+.examHlCount .examHlGood, .examHlCount .examHlBad { padding: 1px 6px; font-weight: 700; }
+.examDocPractice { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; font-size: 13px; }
+.examDocPractice select { padding: 5px 8px; border-radius: 8px; border: 1px solid var(--border-strong); font-size: 13px; }
+.examDocPracticeHint { font-size: 11.5px; color: var(--text-secondary); }
+.examDocPracticeRun, .examDocPracticeOther {
+  position: sticky; top: 0; z-index: 4; background: var(--card-bg); border: 2px solid #b4570f; border-radius: 10px; padding: 8px 12px;
+}
+.examDocPracticeLabel { font-weight: 800; color: #b4570f; }
+.examDocTimer { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.examDocPracticeOver .examDocTimer { color: #b42318; }
+.examDocPracticeOf { color: var(--text-secondary); font-size: 12px; }
+.examDocDoneBtn { font-weight: 800; }
+.examDocRelated { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+.examDocRelatedTitle { font-weight: 800; font-size: 14px; margin-bottom: 6px; }
+.examDocRelatedNote { font-size: 12px; color: var(--text-secondary); }
+.examDocRelatedList { display: flex; flex-wrap: wrap; gap: 6px; }
+.examDocRelatedItem {
+  font-size: 13px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border-strong);
+  background: var(--tint-6); color: var(--text); cursor: pointer; box-shadow: none; text-align: left;
+}
+.examYearLink { text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; cursor: pointer; }
+/* 年度の一覧（進み具合） */
+.examDocHomeBar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.examDocExamTabs { display: inline-flex; gap: 4px; }
+.examDocHomeNote { font-size: 12px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 8px; }
+.examDocSaveAll { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 12px; color: var(--text-secondary); }
+.examDocYears { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.examDocYearCard { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.examDocYearHead { display: flex; align-items: baseline; gap: 8px; }
+.examDocYearName { font-weight: 800; font-size: 15px; }
+.examDocYearCount { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.examDocSavedMark { margin-left: auto; font-size: 12px; }
+.examDocProg { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; margin: 6px 0 8px; }
+.examDocProg i { display: block; height: 100%; background: #0057e7; }
+.examDocYearSubjects { display: grid; gap: 2px; }
+.examDocSubjRow { display: flex; align-items: center; gap: 6px; }
+.examDocSubjName {
+  flex: 1 1 auto; min-width: 0; text-align: left; font-size: 13px; padding: 3px 4px; border: none; background: transparent;
+  color: var(--text); cursor: pointer; box-shadow: none; border-radius: 6px;
+}
+.examDocSubjName:hover { background: var(--tint-6); }
+.examDot {
+  width: 18px; height: 18px; min-width: 18px; border-radius: 50%; padding: 0; cursor: pointer; box-shadow: none;
+  border: 2px solid var(--border-strong); background: var(--card-bg); display: inline-block; vertical-align: middle;
+}
+.examDot-mondai { border-color: var(--exam-q); }
+.examDot-shushi { border-color: var(--exam-s); }
+.examDot-jikkan { border-color: var(--exam-k); }
+.examDot-mondai.read { background: var(--exam-q); }
+.examDot-shushi.read { background: var(--exam-s); }
+.examDot-jikkan.read { background: var(--exam-k); }
+.examDot.none { border-style: dotted; opacity: 0.45; cursor: default; }
+.examDocLegend { font-size: 11.5px; color: var(--text-secondary); margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.examDocLegend .examDot { width: 11px; height: 11px; min-width: 11px; cursor: default; }
+/* 表のマスを長押ししたときに下から出る小さな画面 */
+.examDocSheet { display: none; position: fixed; inset: 0; z-index: 1100; background: rgba(0, 0, 0, 0.3); }
+.examDocSheet.show { display: flex; align-items: flex-end; justify-content: center; }
+.examDocSheetBox {
+  background: var(--card-bg); color: var(--text); width: 100%; max-width: 560px; border-radius: 14px 14px 0 0;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.18);
+  display: grid; gap: 10px;
+}
+.examDocSheetHead { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.examDocSheetExam { font-size: 12px; color: var(--text-secondary); }
+.examDocSheetClose { margin-left: auto; border: none; background: transparent; font-size: 16px; cursor: pointer; box-shadow: none; color: var(--text-secondary); }
+.examDocSheetBtns { display: flex; flex-wrap: wrap; gap: 8px; }
+.examDocSheetBtn { font-size: 14px; font-weight: 700; padding: 9px 14px; border-radius: 10px; cursor: pointer; }
+.examDocSheetBtn[disabled] { opacity: 0.45; cursor: default; }
+.examDocSheetBtn-mondai { color: var(--exam-q); }
+.examDocSheetBtn-shushi { color: var(--exam-s); }
+.examDocSheetBtn-jikkan { color: var(--exam-k); }
+.examDocSheetNote { font-size: 12px; color: var(--text-secondary); }
+@media (max-width: 640px) {
+  .examDocView { padding: 12px 10px; }
+  .examDocKindTab { font-size: 13px; padding: 6px 9px; }
+  .examDocBody { font-size: 15.5px; }
+  .examDocTimer { font-size: 19px; }
+}
+/* ▲▲▲ 過去問の資料 ここまで ▲▲▲ */

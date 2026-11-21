@@ -1,0 +1,760 @@
+{
+ "version": 1,
+ "source": "法務省ウェブサイト",
+ "years": [
+  {
+   "exam": "司法試験",
+   "year": 8,
+   "file": "shiho-R8.json",
+   "rev": "5ba4d46e6475",
+   "bytes": 298117,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi"
+    ],
+    "民法": [
+     "mondai",
+     "shushi"
+    ],
+    "商法": [
+     "mondai",
+     "shushi"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "労働法": [
+     "mondai",
+     "shushi"
+    ]
+   }
+  },
+  {
+   "exam": "司法試験",
+   "year": 7,
+   "file": "shiho-R7.json",
+   "rev": "b2bf926e77b8",
+   "bytes": 512326,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "民法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "商法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "労働法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ]
+   }
+  },
+  {
+   "exam": "司法試験",
+   "year": 6,
+   "file": "shiho-R6.json",
+   "rev": "fec4ebef24ad",
+   "bytes": 502257,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "民法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "商法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "労働法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ]
+   }
+  },
+  {
+   "exam": "司法試験",
+   "year": 5,
+   "file": "shiho-R5.json",
+   "rev": "4b615661e3a9",
+   "bytes": 461293,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "民法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "商法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "労働法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ]
+   }
+  },
+  {
+   "exam": "司法試験",
+   "year": 4,
+   "file": "shiho-R4.json",
+   "rev": "3fc89ec683d0",
+   "bytes": 478658,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "民法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "商法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "労働法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ]
+   }
+  },
+  {
+   "exam": "司法試験",
+   "year": 3,
+   "file": "shiho-R3.json",
+   "rev": "72eddcb35df2",
+   "bytes": 462393,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "民法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "商法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "労働法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ]
+   }
+  },
+  {
+   "exam": "司法試験",
+   "year": 2,
+   "file": "shiho-R2.json",
+   "rev": "1dee171ba2f3",
+   "bytes": 477887,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "民法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "商法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "労働法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ]
+   }
+  },
+  {
+   "exam": "司法試験",
+   "year": 1,
+   "file": "shiho-R1.json",
+   "rev": "a27a83d6dde8",
+   "bytes": 474481,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "民法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "商法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ],
+    "労働法": [
+     "mondai",
+     "shushi",
+     "jikkan"
+    ]
+   }
+  },
+  {
+   "exam": "予備試験",
+   "year": 8,
+   "file": "yobi-R8.json",
+   "rev": "1dcb9a724c29",
+   "bytes": 97215,
+   "subjects": {
+    "憲法": [
+     "mondai"
+    ],
+    "行政法": [
+     "mondai"
+    ],
+    "民法": [
+     "mondai"
+    ],
+    "商法": [
+     "mondai"
+    ],
+    "民事訴訟法": [
+     "mondai"
+    ],
+    "刑法": [
+     "mondai"
+    ],
+    "刑事訴訟法": [
+     "mondai"
+    ],
+    "労働法": [
+     "mondai"
+    ],
+    "実務基礎民事": [
+     "mondai"
+    ],
+    "実務基礎刑事": [
+     "mondai"
+    ]
+   }
+  },
+  {
+   "exam": "予備試験",
+   "year": 7,
+   "file": "yobi-R7.json",
+   "rev": "51e4c08a2def",
+   "bytes": 122577,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi"
+    ],
+    "民法": [
+     "mondai",
+     "shushi"
+    ],
+    "商法": [
+     "mondai",
+     "shushi"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "労働法": [
+     "mondai",
+     "shushi"
+    ],
+    "実務基礎民事": [
+     "mondai",
+     "shushi"
+    ],
+    "実務基礎刑事": [
+     "mondai",
+     "shushi"
+    ]
+   }
+  },
+  {
+   "exam": "予備試験",
+   "year": 6,
+   "file": "yobi-R6.json",
+   "rev": "ea9c9dcf92e9",
+   "bytes": 109175,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi"
+    ],
+    "民法": [
+     "mondai",
+     "shushi"
+    ],
+    "商法": [
+     "mondai",
+     "shushi"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "労働法": [
+     "mondai",
+     "shushi"
+    ],
+    "実務基礎民事": [
+     "mondai",
+     "shushi"
+    ],
+    "実務基礎刑事": [
+     "mondai",
+     "shushi"
+    ]
+   }
+  },
+  {
+   "exam": "予備試験",
+   "year": 5,
+   "file": "yobi-R5.json",
+   "rev": "3680e6b3aab6",
+   "bytes": 122987,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi"
+    ],
+    "民法": [
+     "mondai",
+     "shushi"
+    ],
+    "商法": [
+     "mondai",
+     "shushi"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "労働法": [
+     "mondai",
+     "shushi"
+    ],
+    "実務基礎民事": [
+     "mondai",
+     "shushi"
+    ],
+    "実務基礎刑事": [
+     "mondai",
+     "shushi"
+    ]
+   }
+  },
+  {
+   "exam": "予備試験",
+   "year": 4,
+   "file": "yobi-R4.json",
+   "rev": "36476b69d2bd",
+   "bytes": 108961,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi"
+    ],
+    "民法": [
+     "mondai",
+     "shushi"
+    ],
+    "商法": [
+     "mondai",
+     "shushi"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "労働法": [
+     "mondai",
+     "shushi"
+    ],
+    "実務基礎民事": [
+     "mondai",
+     "shushi"
+    ],
+    "実務基礎刑事": [
+     "mondai",
+     "shushi"
+    ]
+   }
+  },
+  {
+   "exam": "予備試験",
+   "year": 3,
+   "file": "yobi-R3.json",
+   "rev": "c603e4973fb5",
+   "bytes": 97299,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi"
+    ],
+    "民法": [
+     "mondai",
+     "shushi"
+    ],
+    "商法": [
+     "mondai",
+     "shushi"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "実務基礎民事": [
+     "mondai",
+     "shushi"
+    ],
+    "実務基礎刑事": [
+     "mondai",
+     "shushi"
+    ]
+   }
+  },
+  {
+   "exam": "予備試験",
+   "year": 2,
+   "file": "yobi-R2.json",
+   "rev": "f072f392cb6f",
+   "bytes": 88078,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi"
+    ],
+    "民法": [
+     "mondai",
+     "shushi"
+    ],
+    "商法": [
+     "mondai",
+     "shushi"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "実務基礎民事": [
+     "mondai",
+     "shushi"
+    ],
+    "実務基礎刑事": [
+     "mondai",
+     "shushi"
+    ]
+   }
+  },
+  {
+   "exam": "予備試験",
+   "year": 1,
+   "file": "yobi-R1.json",
+   "rev": "7d00a21bb7a1",
+   "bytes": 89123,
+   "subjects": {
+    "憲法": [
+     "mondai",
+     "shushi"
+    ],
+    "行政法": [
+     "mondai",
+     "shushi"
+    ],
+    "民法": [
+     "mondai",
+     "shushi"
+    ],
+    "商法": [
+     "mondai",
+     "shushi"
+    ],
+    "民事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑法": [
+     "mondai",
+     "shushi"
+    ],
+    "刑事訴訟法": [
+     "mondai",
+     "shushi"
+    ],
+    "実務基礎民事": [
+     "mondai",
+     "shushi"
+    ],
+    "実務基礎刑事": [
+     "mondai",
+     "shushi"
+    ]
+   }
+  }
+ ]
+}

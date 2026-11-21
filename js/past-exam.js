@@ -274,7 +274,8 @@ function renderPastMatrixLegend() {
   if (!legendEl) return;
   legendEl.innerHTML = STUDY_COUNT_BUCKETS.map(b => {
     return '<span class="pastMatrixLegendDot"><span class="pastMatrixLegendSwatch" style="background:' + STUDY_COUNT_COLORS[b] + ';"></span>' + STUDY_COUNT_LABELS[b] + '</span>';
-  }).join('');
+  }).join('')
+    + '<span class="pastMatrixLegendHint">マスを長押し：問題・出題趣旨・採点実感（令和）</span>';
 }
 
 function renderPastMatrixTable() {
@@ -436,7 +437,8 @@ function renderExamTrendRanking() {
       + '<span class="examTrendRank">' + (i + 1) + '</span>'
       + '<span class="examTrendSubject">' + escapeHtml(e.subject || 'その他') + '</span>'
       + '<span class="examTrendEntryTitle">' + escapeHtml(e.title) + '</span>'
-      + '<span class="examTrendYears">' + buildYearHtml(e.year) + '</span>'
+      // 令和の年度は、押すとその年度・科目の出題趣旨が開く（js/exam-docs.js）
+      + '<span class="examTrendYears">' + (typeof examDocsYearLinksHtml === 'function' ? examDocsYearLinksHtml(e, pastMatrixCurrentType) : buildYearHtml(e.year)) + '</span>'
       + '<span class="examTrendCount">' + freq + '回</span>'
       + '</div>';
   }).join('');

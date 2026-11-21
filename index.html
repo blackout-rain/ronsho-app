@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>論証集アプリ v31.6（真っ黒の画面で読み上げが止まる不具合を修正）</title>
+<title>論証集アプリ v32.0（過去問タブで問題・出題趣旨・採点実感を読めるように）</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0057e7">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@ try {
 <script src="vendor/jszip/jszip.min.js"></script><link rel="stylesheet" href="style.css">
 </head>
 <body>
-<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v31.6</span></h1>
+<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v32.0</span></h1>
 <div id="status"></div>
 <div id="syncConflictBanner" class="syncConflictBanner"></div>
 <div id="backupReminderBanner" class="backupReminderBanner"></div>
@@ -187,6 +187,9 @@ try {
 </div>
 <!-- ▼▼▼ 新規追加：過去問ログ タブ（既存タブ・既存機能には一切影響しません） ▼▼▼ -->
 <div id="pastExamPage" class="page">
+  <!-- ▼ 問題・出題趣旨・採点実感を読む画面（js/exam-docs.js）。開いている間は下の表・ランキングを隠す ▼ -->
+  <div id="examDocView" class="examDocView"></div>
+  <div id="examDocSheet" class="examDocSheet"></div>
   <div class="pastMatrixCard">
     <div class="pastCombinedGrid">
       <div class="pastMatrixCol">
@@ -561,6 +564,7 @@ try {
 <script src="js/precedent.js"></script>
 <script src="js/book.js"></script>
 <script src="js/lawref.js"></script>
+<script src="js/exam-docs.js"></script>
 <script src="js/gamification.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/backup.js"></script>
