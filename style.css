@@ -1650,9 +1650,11 @@ html.speechDarkActive { scrollbar-gutter: auto; } /* パソコンでスクロー
    左右に並べる。マス側の列は内容（＝科目数が多い予備試験の表）の実幅に
    ぴったり合わせ（max-content）、無駄な余白が出ないようにする */
 .pastCombinedGrid { display: grid; grid-template-columns: max-content 1fr; gap: 24px; align-items: start; }
-@media (max-width: 640px) { .pastCombinedGrid { grid-template-columns: 1fr; } }
+/* 一覧の表（約550px）とログの表（約480px）を並べるには幅が約1150px要る。iPadの縦向き・小さめの横向きでは、
+   並べるとログが画面の外にはみ出すので、1100px以下は縦に積む（v32.1） */
+@media (max-width: 1100px) { .pastCombinedGrid { grid-template-columns: 1fr; } }
 .pastMatrixCol { min-width: 0; }
-.pastLogCol { min-width: 0; }
+.pastLogCol { min-width: 0; overflow-x: auto; }
 .pastMatrixTabBtn {
   border: 1px solid #dbe6f2; background: var(--tint-6); color: var(--text-secondary);
   font-size: 13px; font-weight: 700; padding: 6px 16px; border-radius: 999px; cursor: pointer;
@@ -2047,7 +2049,7 @@ html { scrollbar-gutter: stable; }
 
 /* ▼▼▼ 過去問の資料（問題・出題趣旨・採点実感）js/exam-docs.js v32.0 ▼▼▼ */
 .pastMatrixLegendHint { flex-basis: 100%; font-size: 11px; color: var(--text-secondary); }
-.pastMatrixCell { -webkit-touch-callout: none; }
+.pastMatrixCell { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
 .pastMatrixTabBtn.examDocOpenBtn { margin-left: auto; }
 .pastMatrixTabBtn.examDocOpenBtnRun { background: #b4570f; border-color: #b4570f; color: #fff; }
 /* 読む画面を開いている間は、表・ランキングを隠して読むことに集中する */

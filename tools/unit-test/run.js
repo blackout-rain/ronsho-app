@@ -755,6 +755,21 @@ async function runAsyncChecks() {
   eq('iPhoneでは画面が遷移するダウンロードに切り替えない', downloads(), 1);
 }
 
+console.log('\n■ iPad：マスの長押し・過去問ログのはみ出し（v32.1）');
+{
+  const css = read('style.css'), js = read('js/exam-docs.js');
+  // 実機のiPadでは pointercancel が長押しの途中で出て長押しが途切れたため、指は touch イベントで見る
+  check('指の長押しは touchstart で測る', /wrap\.addEventListener\('touchstart'/.test(js));
+  check('指の長押しは touchcancel では取り消さない（iPadが出すことがある）', !/addEventListener\('touchcancel'/.test(js) && !/'touchcancel'/.test(js));
+  check('指の pointer イベントは長押しに使わない（二重に動かさない）', (js.match(/pointerType === 'touch'\) return;/g) || []).length >= 3);
+  check('スクロールしたら長押しを取り消す', /addEventListener\('scroll', cancel, true\)/.test(js));
+  check('マスは Safari 用の -webkit-user-select: none（文字選択・拡大鏡が出ない）', /\.pastMatrixCell \{[^}]*-webkit-user-select: none/.test(css));
+  // 一覧(約550px)とログ(約480px)を左右に並べるのは幅が足りるときだけ。iPadの縦向きではログがはみ出していた
+  const m = css.match(/@media \(max-width: (\d+)px\) \{ \.pastCombinedGrid \{ grid-template-columns: 1fr; \} \}/);
+  check('過去問ログは1100px以下で縦に積む（iPadの縦向き・小さめの横向き）', !!m && Number(m[1]) >= 1100, m ? m[1] + 'px' : '見つからない');
+  check('ログ欄は幅が足りなくても画面の外に出さず、その中で横にスクロールする', /\.pastLogCol \{[^}]*overflow-x: auto/.test(css));
+}
+
 runAsyncChecks().catch(e => check('非同期のチェックを実行できる', false, e && e.stack)).then(() => {
   console.log('');
   if (failures > 0) {
