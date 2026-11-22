@@ -82,27 +82,32 @@ function examDocsParagraphClass(p) {
   return { bad: kinds.includes('bad'), good: kinds.includes('good') };
 }
 // 1つの段落をHTMLにする。hl が真なら文ごとに色を付ける
-function examDocsParaHtml(p, hl) {
-  if (examDocsIsHeading(p)) return '<p class="examDocH">' + escapeHtml(p) + '</p>';
-  if (!hl) return '<p>' + escapeHtml(p) + '</p>';
+// pi：段落の番号（出題趣旨で指摘された条文・判例の一覧から、その段落へ飛ぶため）
+function examDocsParaHtml(p, hl, pi) {
+  const at = pi == null ? '' : ' data-pi="' + pi + '"';
+  if (examDocsIsHeading(p)) return '<p class="examDocH"' + at + '>' + escapeHtml(p) + '</p>';
+  if (!hl) return '<p' + at + '>' + escapeHtml(p) + '</p>';
   const html = examDocsSplitSentences(p).map(s => {
     const c = examDocsClassifySentence(s);
     if (c === 'bad') return '<span class="examHlBad">' + escapeHtml(s) + '</span>';
     if (c === 'good') return '<span class="examHlGood">' + escapeHtml(s) + '</span>';
     return escapeHtml(s);
   }).join('');
-  return '<p>' + html + '</p>';
+  return '<p' + at + '>' + html + '</p>';
 }
 // filter: 'all' | 'bad' | 'good'。絞り込むときも見出しは残し、どの設問の話かが分かるようにする
 function examDocsBodyHtml(paras, opts) {
   const hl = !!(opts && opts.hl);
   const filter = (opts && opts.filter) || 'all';
-  const list = (paras || []).filter(p => {
-    if (filter === 'all' || examDocsIsHeading(p)) return true;
-    const c = examDocsParagraphClass(p);
-    return filter === 'bad' ? c.bad : c.good;
-  });
-  let html = list.map(p => examDocsParaHtml(p, hl)).join('');
+  let html = (paras || []).map((p, pi) => {
+    if (filter !== 'all' && !examDocsIsHeading(p)) {
+      const c = examDocsParagraphClass(p);
+      if (filter === 'bad' ? !c.bad : !c.good) return '';
+    }
+    return examDocsParaHtml(p, hl, pi);
+  }).join('');
+  // 判例の引用に下線（押すと百選・判例タブ・ほかの年度の指摘。js/exam-refs.js、v33.0〜）
+  if (opts && opts.cases && typeof examRefsLinkifyCasesHtml === 'function') html = examRefsLinkifyCasesHtml(html);
   // 条文リンク：試験の文は「本件条例第３２条」のような架空の法令が多いので、
   // 法律名つきの参照（「民法第４１５条」「行訴法第９条」など）だけに付ける（科目を渡さない）
   if (typeof linkifyLawRefs === 'function') html = linkifyLawRefs(html, null);
@@ -393,6 +398,7 @@ function openExamDocs(opts) {
   examDocsState.year = o.year == null ? null : Number(o.year);
   if (o.subject) examDocsState.subject = o.subject;
   if (o.kind) examDocsState.kind = o.kind;
+  examDocsState.focusPara = o.focusPara == null || !Number.isFinite(Number(o.focusPara)) ? null : Number(o.focusPara);
   examDocsState.message = '';
   examDocsState.quitArmed = false;
   examDocsState.open = true;
@@ -402,7 +408,7 @@ function openExamDocs(opts) {
   const els = examDocsEls();
   if (els.page) els.page.classList.add('examDocsOpen');
   renderExamDocs();
-  if (els.view && els.view.scrollIntoView) {
+  if (els.view && els.view.scrollIntoView && examDocsState.focusPara == null) {
     try { els.view.scrollIntoView({ block: 'start' }); } catch (e) {}
   }
 }
@@ -488,7 +494,7 @@ function examDocsPanelHtml(st, data, kind, view, readMap, locked) {
       + '<span class="examHlNote">言い回しで機械的に判定しています</span>'
       + '</div>';
   }
-  const opts = kind.id === 'jikkan' ? { hl: view.hl, filter: view.filter } : { hl: false, filter: 'all' };
+  const opts = kind.id === 'jikkan' ? { hl: view.hl, filter: view.filter, cases: true } : { hl: false, filter: 'all', cases: kind.id === 'shushi' };
   html += '<div class="examDocBody">' + examDocsBodyHtml(doc.paras, opts) + '</div>';
   html += '<div class="examDocPanelFoot">'
     + '<button type="button" class="examReadBtn' + (read ? ' on' : '') + '" data-act="toggleRead" data-kind="' + kind.id + '">' + (read ? '✔ 読んだ' : '○ 読んだ印をつける') + '</button>'
@@ -599,6 +605,17 @@ async function renderExamDocs() {
   }
   els.view.dataset.renderedFor = examDocsRenderKey();
   if (prevScroll) examDocsRestoreScrolls(els.view, prevScroll);
+  // 出題趣旨の一覧（条文・判例）から開いたときは、その段落まで送って目印を付ける
+  if (st.focusPara != null) {
+    const pi = st.focusPara;
+    st.focusPara = null;
+    const panel = els.view.querySelector('.examDocPanel[data-kind="' + st.kind + '"]') || els.view;
+    const target = panel.querySelector('p[data-pi="' + pi + '"]');
+    if (target) {
+      target.classList.add('examDocFocus');
+      try { target.scrollIntoView({ block: 'center' }); } catch (e) {}
+    }
+  }
   examDocsUpdateTimer();
 }
 function examDocsRenderKey() {
@@ -830,6 +847,10 @@ function examDocsHandleAction(el, evt) {
     v.filter = el.dataset.filter;
     saveExamDocsView(v);
     renderExamDocs();
+    return;
+  }
+  if (act === 'caseRef') {
+    if (typeof openExamCasePopup === 'function') openExamCasePopup(el.dataset.ck, el.dataset.rep || '', el.firstChild && el.firstChild.nodeValue ? el.firstChild.nodeValue : el.textContent);
     return;
   }
   if (act === 'openEntry') {

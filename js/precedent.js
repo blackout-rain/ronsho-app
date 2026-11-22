@@ -677,6 +677,21 @@ function renderPrecedentPage() {
   const progressEl = document.getElementById('precedentProgress');
   const area = document.getElementById('precedentArea');
   if (!area) return;
+  // 「🎯 出題趣旨の判例」の一覧（js/exam-refs.js、v33.0〜）を開いている間は、カードを隠す
+  const examMode = typeof precedentExamMode !== 'undefined' && precedentExamMode;
+  const examPane = document.getElementById('precedentExamPane');
+  const examBtn = document.getElementById('precedentExamToggleBtn');
+  if (examBtn) examBtn.textContent = examMode ? '⚖️ 判例のカードに戻る' : '🎯 出題趣旨の判例';
+  if (examPane) examPane.style.display = examMode ? '' : 'none';
+  // 編集フォームを開いている間は、カードは隠したまま（setPrecedentFormOpen と同じ決まり）
+  const formEl = document.getElementById('precedentForm');
+  const formOpen = !!(formEl && formEl.classList && formEl.classList.contains('pastLogFormOpen'));
+  area.style.display = examMode || formOpen ? 'none' : '';
+  if (progressEl) progressEl.style.display = examMode || formOpen ? 'none' : '';
+  if (examMode) {
+    if (typeof renderPrecedentExamPane === 'function') renderPrecedentExamPane();
+    return;
+  }
   const list = precedentFilteredList();
   if (precedentIndex >= list.length) precedentIndex = Math.max(0, list.length - 1);
 
@@ -703,6 +718,8 @@ function renderPrecedentPage() {
     + '<button type="button" class="quizNavBtn" id="precedentNextBtn"' + (precedentIndex >= list.length - 1 ? ' disabled' : '') + '>次の判例 ▶</button>'
     + '</div>';
   html += buildPrecedentHeaderHtml(p);
+  // 出題趣旨での指摘（判決日で照らし合わせる。読み込みが終わってから中身を入れる）
+  html += '<div id="precedentExamRefs" class="precedentExamRefs"></div>';
   if (!precedentRevealed) {
     html += '<div class="quizShowBtn" id="precedentShowBtn">📖 内容を表示</div>';
   } else {
@@ -710,6 +727,7 @@ function renderPrecedentPage() {
   }
   html += '</div>';
   area.innerHTML = html;
+  if (typeof renderPrecedentExamRefs === 'function') renderPrecedentExamRefs(p);
 
   area.querySelectorAll('.precedentViewTab').forEach(tab => tab.addEventListener('click', () => {
     precedentViewMode = tab.dataset.mode;

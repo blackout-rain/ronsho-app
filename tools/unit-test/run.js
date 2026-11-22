@@ -800,6 +800,91 @@ console.log('\n■ iPad：マスの長押し・過去問ログのはみ出し（
   check('ログ欄は幅が足りなくても画面の外に出さず、その中で横にスクロールする', /\.pastLogCol \{[^}]*overflow-x: auto/.test(css));
 }
 
+console.log('\n■ 出題趣旨の条文・判例：読み取り・索引・照合（v33.0）');
+{
+  const rf = loadApp(['js/core.js', 'js/past-exam.js', 'js/precedent.js', 'js/lawref.js', 'js/exam-docs.js', 'js/exam-refs.js']);
+  const find = t => rf('examRefsFindCases')(t).map(c => [c.text, c.key, c.rep]);
+  eq('略称（最大判）と判例集', find('薬事法事件判決（最大判昭和５０年４月３０日民集２９巻４号５７２頁）が参考になる'),
+    [['最大判昭和５０年４月３０日民集２９巻４号５７２頁', '最|1975-04-30', '民集29-4-572']]);
+  eq('「最高裁判所…第二小法廷決定・民集」の書き方', find('判例（最高裁判所平成１１年１１月１２日第二小法廷決定・民集５３巻８号１７８７頁ほか）'),
+    [['最高裁判所平成１１年１１月１２日第二小法廷決定・民集５３巻８号１７８７頁', '最|1999-11-12', '民集53-8-1787']]);
+  eq('判決日が先の書き方（「昭和４４年１２月１８日最高裁判決」）', find('前掲昭和４４年１２月１８日最高裁判決参照'), [['昭和４４年１２月１８日最高裁判決', '最|1969-12-18', '']]);
+  eq('大審院・民録（輯）', find('大判明治３７年６月２２日民録１０輯８６１頁'), [['大判明治３７年６月２２日民録１０輯８６１頁', '大|1904-06-22', '民録10-861']]);
+  eq('「前掲」は裁判所名に入れない・高裁', find('前掲東京高決平成１７年３月２３日を踏まえ'), [['東京高決平成１７年３月２３日', '高|2005-03-23', '']]);
+  eq('支部の地裁・判例時報の言い換え', find('千葉地佐倉支決昭和５６年９月１日判例時報１０２１号１３４頁').map(x => [x[1], x[2]]), [['地|1981-09-01', '判時1021-134']]);
+  eq('半角・「・」区切り・元年', find('最判平元・3・7').map(x => x[1]), ['最|1989-03-07']);
+  eq('判例でない日付（令和２年４月１日に施行）は拾わない', find('令和２年４月１日に施行された民法（債権関係）'), []);
+  const compat = rf('examRefsRepCompatible');
+  eq('判例集の食い違いだけを別の判例とみなす', [compat('民集29-4-572', ''), compat('民集29-4-572', '民集29-4-572'), compat('民集31-2-234', '民集31-2-280'), compat('民集23-11-2150', '刑集23-11-1490')], [true, true, false, true]);
+  const arts = rf('examRefsFindArticles')('民法第４２４条の５と、同法第１７８条。会社法第８３１条第１項、旧民法第１条、法第３条、本件条例第３２条')
+    .map(a => a.lid + a.num + (a.branch ? '-' + a.branch : ''));
+  eq('条文：法律名つき・「同法」は直前の法律、旧法・法律名なし・条例は数えない', arts, ['minpou424-5', 'minpou178', 'kaishahou831']);
+  // 索引づくり：出題趣旨だけを数え、同じ段落の重なりは1回
+  const idx = rf('examRefsBuildIndex')([{ code: 'shiho', year: 5, data: { subjects: { 民法: {
+    shushi: { paras: ['民法第７０９条と民法第７０９条。最判昭和４４年９月１２日判例時報５７２号２５頁', '同じ判例（最判昭和４４年９月１２日）'] },
+    jikkan: { paras: ['民法第１条（最判平成元年１月１日）'] } } } } }]);
+  eq('索引：条文は段落ごとに1回・採点実感は数えない', idx.articles, { 'minpou|709': [['shiho', 5, '民法', 0]] });
+  eq('索引：判例の指摘に判例集を添える', idx.cases['最|1969-09-12'].m, [['shiho', 5, '民法', 0, '判時572-25'], ['shiho', 5, '民法', 1, '']]);
+  check('索引：採点実感だけの判例は入れない', !idx.cases['最|1989-01-01']);
+  // 入っている data/exam/refs.json が、今の資料・今の読み取り方で作り直したものと一致するか
+  const rebuilt = require(path.join(ROOT, 'tools', 'exam-fetch', 'build-refs.js')).buildRefs();
+  const stored = JSON.parse(read('data/exam/refs.json'));
+  eq('data/exam/refs.json は最新（資料を作り直したら node tools/exam-fetch/build-refs.js）', JSON.stringify(stored) === JSON.stringify(rebuilt), true);
+  check('索引に主な条文・判例が入っている', stored.articles['minpou|95'] && stored.articles['kaishahou|831'] && stored.cases['最|1975-04-30'],
+    Object.keys(stored.articles).length + '条・' + Object.keys(stored.cases).length + '件');
+  // 百選の目次の取り込み（例は架空の書名・判例名）
+  const parsed = rf('parseHyakusenToc')('テスト判例百選Ⅰ（第9版）\n1　テスト一事件（最大判昭和50年4月30日民集29巻4号572頁）\n2 テスト二事件（最判平成元年3月7日）\n3　判決日のない行\n\nもう一冊の判例百選（第2版）\n10-2　テスト三事件（東京高判平成17年3月23日）', '');
+  eq('目次：書名ごとに分け、番号・判例名・判決日を読む', parsed.books.map(b => [b.title, b.items.map(i => [i.no, i.name, i.date])]),
+    [['テスト判例百選Ⅰ（第9版）', [['1', 'テスト一事件', '最大判昭和50年4月30日民集29巻4号572頁'], ['2', 'テスト二事件', '最判平成元年3月7日']]],
+     ['もう一冊の判例百選（第2版）', [['10-2', 'テスト三事件', '東京高判平成17年3月23日']]]]);
+  eq('目次：判決日が読めない行は数えて知らせる', parsed.skipped, 1);
+  eq('目次：書名の行が無ければ書名の欄の値を使う', rf('parseHyakusenToc')('5　テスト事件（最判昭和44年9月12日）', '手入力の書名').books.map(b => b.title), ['手入力の書名']);
+  const merged = rf('mergeHyakusenToc')([{ id: 'a', title: 'テスト判例百選Ⅰ（第9版）', items: [] }, { id: 'b', title: '別の本', items: [] }], parsed.books, '2026-11-22');
+  eq('目次：同じ書名は入れ替え、新しい書名は足す', merged.map(b => [b.id === 'a' || b.id === 'b' ? b.id : 'new', b.title, b.items.length]),
+    [['a', 'テスト判例百選Ⅰ（第9版）', 2], ['b', '別の本', 0], ['new', 'もう一冊の判例百選（第2版）', 1]]);
+  eq('書名から科目', ['憲法判例百選Ⅰ', '会社法判例百選', '民事訴訟法判例百選', '刑法判例百選Ⅱ', '行政判例百選Ⅰ', '労働判例百選', '家族法判例百選'].map(rf('hyakusenSubjectOf')),
+    ['憲法', '商法', '民事訴訟法', '刑法', '行政法', '労働法', '民法']);
+  // 照合：判例タブの判例（判決日の欄）と、取り込んだ目次
+  rf('localStorage').setItem('ronshoHyakusenTocV1', JSON.stringify(parsed.books.map((b, i) => Object.assign({ id: 't' + i }, b))));
+  rf('precedents = [{ id: "p1", name: "登録した判例", date: "最高裁昭和50年4月30日大法廷判決", subject: "憲法" }, { id: "p2", name: "別の日", date: "最判昭和51年1月1日" }]');
+  const m1 = rf('examRefsMatchCase')('最|1975-04-30', '民集29-4-572');
+  eq('照合：判決日で判例タブと目次の両方に当たる', [m1.precedents.map(p => p.id), m1.toc.map(t => t.book + ' ' + t.no)], [['p1'], ['テスト判例百選Ⅰ（第9版） 1']]);
+  eq('照合：判例集が食い違えば当てない', rf('examRefsMatchCase')('最|1975-04-30', '民集30-1-1').toc.length, 0);
+  eq('照合：判例タブの判例を変えたら照合も変わる', (rf('precedents.push({ id: "p3", date: "最決平成元年3月7日" })'), rf('examRefsMatchCase')('最|1989-03-07', '').precedents.map(p => p.id)), ['p3']);
+  // 資料の本文：判例の引用に下線と「百選○」、タグの中は触らない
+  const linked = rf('examRefsLinkifyCasesHtml')('<p data-pi="3">判例（最大判昭和５０年４月３０日民集２９巻４号５７２頁）と最判平成２年１月１日。</p>');
+  check('資料：百選にある判例は下線＋「百選1」', /<span class="examCaseRef hit" data-act="caseRef" data-ck="最\|1975-04-30" data-rep="民集29-4-572"[^>]*>最大判昭和５０年４月３０日民集２９巻４号５７２頁<span class="examCaseBadge">百選1<\/span><\/span>/.test(linked), linked);
+  check('資料：どこにも無い判例は下線だけ（印なし）', /<span class="examCaseRef" data-act="caseRef" data-ck="最\|1990-01-01"/.test(linked) && /data-pi="3"/.test(linked), linked);
+  const body = rf('examDocsBodyHtml')(['最判平成２年１月１日', '〔設問１〕'], { hl: false, filter: 'all', cases: true });
+  check('資料：段落に番号（data-pi）を付ける', /<p data-pi="0">/.test(body) && /<p class="examDocH" data-pi="1">/.test(body), body);
+  check('資料：問題文には判例の下線を付けない（cases を渡さない）', !/examCaseRef/.test(rf('examDocsBodyHtml')(['最判平成２年１月１日'], { hl: false, filter: 'all' })));
+  check('資料：絞り込んでも段落の番号は元のまま', /data-pi="2"/.test(rf('examDocsBodyHtml')(['〔設問〕', 'よく書けていた答案があった。', '検討が不十分な答案が多かった。'], { hl: true, filter: 'bad' })));
+  // 指摘のボタン：年度・科目ごとにまとめ、新しい年度から
+  const chips = rf('examRefsMentionChipsHtml')([['shiho', 3, '民法', 4], ['yobi', 5, '民法', 2], ['shiho', 3, '民法', 9], ['shiho', 5, '民法', 1]]);
+  eq('指摘のボタン：年度・科目ごと（同じ資料の2回目は×2）', [...chips.matchAll(/🎯 ([^<]+)/g)].map(x => x[1]), ['司法R5 民法', '予備R5 民法', '司法R3 民法']);
+  check('指摘のボタン：最初の段落へ飛ぶ・×2', /data-exam="新司法試験" data-year="3" data-subj="民法" data-pi="4"/.test(chips) && /×2/.test(chips), chips);
+  eq('指摘の数は資料の数で数える', rf('examRefsDocCount')([['shiho', 3, '民法', 4], ['shiho', 3, '民法', 9], ['yobi', 3, '民法', 1]]), 2);
+  // 一覧：既定は百選の目次・判例タブにあるものだけ
+  const refsSample = { cases: {
+    '最|1975-04-30': { t: '最大判昭和５０年４月３０日', m: [['shiho', 2, '憲法', 1, ''], ['yobi', 4, '憲法', 3, '民集29-4-572']] },
+    '最|1980-01-01': { t: '最判昭和５５年１月１日', m: [['shiho', 2, '民法', 1, '']] } }, articles: { 'minpou|709': [['shiho', 1, '民法', 0], ['shiho', 2, '民法', 0]], 'keiho|199': [['shiho', 1, '刑法', 0]] } };
+  const rows = rf('examRefsCaseRows')(refsSample, false);
+  // 科目は目次の書名 → 判例タブの科目 → 指摘の多い科目の順（ここでは書名に科目が無いので判例タブの「憲法」）
+  eq('判例の一覧：百選・判例タブにあるものだけ', rows.map(r => [r.key, r.count, r.subject]), [['最|1975-04-30', 2, '憲法']]);
+  eq('判例の一覧：「無い判例も出す」で全部', rf('examRefsCaseRows')(refsSample, true).length, 2);
+  eq('条文の一覧：指摘の多い順', rf('examRefsArticleRows')(refsSample).map(r => [r.label, r.count, r.subject]), [['民法709条', 2, '民法'], ['刑法199条', 1, '刑法']]);
+  // 画面のつながり（ソースの確認）
+  const lawJs = read('js/lawref.js'), html = read('index.html'), sw = read('sw.js'), prJs = read('js/precedent.js'), edJs = read('js/exam-docs.js');
+  check('条文タブに「🎯 出題趣旨の条文」', /data-mode="exam">🎯 出題趣旨の条文/.test(html) && /id="lawExamArea"/.test(html));
+  check('判例タブに「🎯 出題趣旨の判例」', /id="precedentExamToggleBtn"/.test(html) && /id="precedentExamPane"/.test(html));
+  check('条文ポップアップ・その場に展開・全条を読むに指摘を出す', (lawJs.match(/lawrefAppendExamMentions\(/g) || []).length >= 3 && /examRefsMentionsDetailsHtml\(examRefsArticleMentions\(lawReadExamRefs/.test(lawJs));
+  check('判例のカードに出題趣旨での指摘', /renderPrecedentExamRefs\(p\)/.test(prJs));
+  check('出題趣旨の一覧から開くと、その段落へ送る', /p\[data-pi="' \+ pi \+ '"\]/.test(edJs) && /focusPara: Number\(chip\.dataset\.pi\)/.test(read('js/exam-refs.js')));
+  check('索引とスクリプトをオフライン用に先に取っておく', /'\.\/js\/exam-refs\.js'/.test(sw) && /'\.\/data\/exam\/refs\.json'/.test(sw));
+  check('index.html で exam-refs.js を exam-docs.js の後に読む', html.indexOf('js/exam-refs.js') > html.indexOf('js/exam-docs.js'));
+  check('百選の目次はアプリに入れない（取り込んだものだけ使う）', !fs.existsSync(path.join(ROOT, 'data', 'hyakusen')) && !/百選[^\n]{0,30}\d+事件/.test(read('data/exam/refs.json')));
+}
+
 runAsyncChecks().catch(e => check('非同期のチェックを実行できる', false, e && e.stack)).then(() => {
   console.log('');
   if (failures > 0) {

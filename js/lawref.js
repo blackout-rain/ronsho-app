@@ -659,6 +659,7 @@ function openLawRefPopup(ref) {
     body.innerHTML = lawrefArticleBodyHtml(data, para);
     lawrefScrollToHit(body);
     if (foot) foot.innerHTML = escapeHtml(lawrefSourceNote(data)) + lawrefReadMoreButtonHtml(data, lid);
+    lawrefAppendExamMentions(body, lid, num, branch);
   }).catch(err => {
     const body = document.getElementById('lawModalBody');
     if (!body) return;
@@ -667,6 +668,15 @@ function openLawRefPopup(ref) {
       + 'オンラインになってからもう一度お試しください。（' + escapeHtml(err.message) + '）'
       + lawrefOfflineHint(lid) + '</div>';
   });
+}
+// 出題趣旨で指摘された条文なら、条文の下に「🎯 出題趣旨で指摘（○回）」を足す（js/exam-refs.js、v33.0〜）
+function lawrefAppendExamMentions(container, lid, num, branch) {
+  if (typeof examRefsGet !== 'function' || !container) return;
+  examRefsGet().then(refs => {
+    if (!container.isConnected) return;
+    const html = examRefsMentionsDetailsHtml(examRefsArticleMentions(refs, lid, num, branch), 'lawRefExamRefs');
+    if (html) container.insertAdjacentHTML('beforeend', html);
+  }).catch(() => {});
 }
 function closeLawRefPopup() {
   const root = document.getElementById('lawRefModalRoot');
@@ -700,6 +710,7 @@ function toggleLawRefInline(ref) {
     if (!box.isConnected) return;
     box.querySelector('.lawRefInlineBody').innerHTML = lawrefArticleBodyHtml(data, para);
     box.querySelector('.lawRefInlineFoot').innerHTML = escapeHtml(lawrefSourceNote(data)) + lawrefReadMoreButtonHtml(data, lid);
+    lawrefAppendExamMentions(box.querySelector('.lawRefInlineBody'), lid, num, branch);
   }).catch(err => {
     if (!box.isConnected) return;
     const offline = !navigator.onLine ? 'オフラインのようです。' : '';
@@ -755,10 +766,17 @@ function renderLawStockPage() {
   document.querySelectorAll('.lawStockModeBtn').forEach(b => b.classList.toggle('active', b.dataset.mode === lawStockMode));
   const stockPane = document.getElementById('lawStockStockPane');
   const readPane = document.getElementById('lawStockReadPane');
-  if (stockPane) stockPane.style.display = lawStockMode === 'read' ? 'none' : '';
+  const examPane = document.getElementById('lawStockExamPane');
+  if (stockPane) stockPane.style.display = lawStockMode === 'stock' ? '' : 'none';
   if (readPane) readPane.style.display = lawStockMode === 'read' ? '' : 'none';
+  if (examPane) examPane.style.display = lawStockMode === 'exam' ? '' : 'none';
   if (lawStockMode === 'read') {
     renderLawReadPane();
+    return;
+  }
+  // 出題趣旨で指摘された条文の一覧（js/exam-refs.js、v33.0〜）
+  if (lawStockMode === 'exam') {
+    if (typeof renderLawExamPane === 'function') renderLawExamPane();
     return;
   }
   const all = lawrefStockList();
@@ -863,10 +881,18 @@ async function renderLawReadPane() {
   }
   await renderLawReadContent(token);
 }
+// 全条を読む画面で使う、出題趣旨の索引（読み込めなければ null のまま＝印を出さないだけ）
+let lawReadExamRefs = null;
 function lawReadArticleHtml(rec, i, words) {
   const art = rec.items[i];
   let body = lawrefArticleBodyHtml(art, null);
   if (words && words.length) body = lawReadHighlight(body, words);
+  // 出題趣旨で指摘された条文には印（押すと指摘した年度・科目が開く）
+  if (lawReadExamRefs && typeof examRefsMentionsDetailsHtml === 'function' && art.k && art.k !== 'preamble') {
+    const dash = String(art.k).indexOf('-');
+    const branch = dash === -1 ? null : Number(String(art.k).split('-')[1]);
+    if (!/-.*-/.test(art.k) && !art.to) body += examRefsMentionsDetailsHtml(examRefsArticleMentions(lawReadExamRefs, rec.lid, art.num, branch), 'lawReadExamRefs');
+  }
   return '<div class="lawReadArticle' + (i === lawReadState.hitIndex ? ' lawReadArticleHit' : '') + '" data-i="' + i + '">' + body + '</div>';
 }
 // HTMLのタグの外側（文字の部分）だけで語を <mark> で囲む
@@ -887,6 +913,9 @@ async function renderLawReadContent(token) {
   if (!area) return;
   let rec = null;
   try { rec = await lawfullGetLaw(lawReadState.lid); } catch (e) { rec = null; }
+  if (!lawReadExamRefs && typeof examRefsGet === 'function') {
+    try { lawReadExamRefs = await examRefsGet(); } catch (e) { lawReadExamRefs = null; }
+  }
   if (token !== undefined && token !== lawReadRenderToken) return;
   if (!rec) {
     area.innerHTML = '<div class="lawModalError">保存した条文を読み出せませんでした。もう一度ダウンロードしてください。</div>';
@@ -1013,7 +1042,7 @@ function initLawReadFeature() {
   page.addEventListener('click', (e) => {
     const modeBtn = e.target.closest('.lawStockModeBtn');
     if (modeBtn) {
-      lawStockMode = modeBtn.dataset.mode === 'read' ? 'read' : 'stock';
+      lawStockMode = ['read', 'exam'].includes(modeBtn.dataset.mode) ? modeBtn.dataset.mode : 'stock';
       renderLawStockPage();
       return;
     }
