@@ -248,6 +248,8 @@ function restoreFromBackupPayload(data) {
   if (Array.isArray(data.syncConflicts)) localStorage.setItem('ronshoSyncConflictsV1', JSON.stringify(data.syncConflicts));
   // 過去問の資料の「読んだ」印（v32.0〜）。古いバックアップには無いので、そのときは今の印を残す
   if (data.examRead && typeof data.examRead === 'object' && !Array.isArray(data.examRead)) localStorage.setItem('ronshoExamReadV1', JSON.stringify(data.examRead));
+  // 百選の目次（v33.0〜）。古いバックアップには無いので、そのときは今の目次を残す
+  if (Array.isArray(data.hyakusenToc)) localStorage.setItem('ronshoHyakusenTocV1', JSON.stringify(data.hyakusenToc));
   if (entries.length > 0) {
     downloadBtn.style.display = 'inline-block';
     downloadLogBtn.style.display = 'inline-block';

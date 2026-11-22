@@ -2189,3 +2189,46 @@ html { scrollbar-gutter: stable; }
   .examDocTimer { font-size: 19px; }
 }
 /* ▲▲▲ 過去問の資料 ここまで ▲▲▲ */
+
+/* 出題趣旨で指摘された条文・判例のつながり（js/exam-refs.js、v33.0〜） */
+.examCaseRef {
+  text-decoration: underline dotted;
+  text-decoration-color: var(--exam-s);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.examCaseRef.hit { text-decoration-style: solid; }
+.examCaseRef:hover { background: rgba(15, 138, 106, 0.1); }
+.examCaseBadge {
+  display: inline-block; margin-left: 3px; padding: 0 5px; border-radius: 999px;
+  font-size: 11px; font-weight: 800; line-height: 1.6; vertical-align: 1px;
+  background: var(--exam-s); color: #fff; text-indent: 0;
+}
+.examDocBody p.examDocFocus { background: var(--exam-good-bg); border-radius: 6px; box-shadow: 0 0 0 4px var(--exam-good-bg); transition: background 1.5s; }
+.examRefChips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.examRefMention {
+  font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--exam-s); background: var(--card-bg); color: var(--exam-s);
+}
+.examRefMention:hover { background: var(--tint-1); }
+.examRefChipCount { margin-left: 3px; font-weight: 600; opacity: 0.8; }
+.examRefDetails { margin-top: 8px; font-size: 13px; }
+.examRefDetails > summary { cursor: pointer; font-weight: 700; color: var(--exam-s); list-style-position: inside; }
+.examRefCount {
+  display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 800;
+  background: var(--tint-1); color: var(--exam-s); border: 1px solid var(--border);
+}
+.examRefLine { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 6px 0 2px; }
+.examRefLineTitle { font-size: 13px; font-weight: 800; color: var(--exam-s); }
+.precedentExamRefs:empty { display: none; }
+.examCaseSection { margin: 10px 0; }
+.examCaseSectionTitle { font-weight: 800; font-size: 13px; color: var(--text-secondary2); margin-bottom: 4px; }
+.examCaseTocItem { margin: 3px 0; }
+.examCaseBox .stackBtn { margin: 3px 6px 3px 0; }
+.precedentExamPane { margin-top: 8px; }
+.hyakusenTocBox textarea { width: 100%; min-height: 120px; box-sizing: border-box; margin: 6px 0; }
+.hyakusenTocSteps { margin: 6px 0; padding-left: 1.4em; }
+.hyakusenTocList { margin-top: 8px; display: grid; gap: 4px; }
+.hyakusenTocRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.examRefShowAll { display: block; margin: 6px 0; }
+.examRefCaseCard .lawStockTitle, .lawExamCard .lawStockTitle { display: flex; align-items: center; flex-wrap: wrap; }
