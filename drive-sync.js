@@ -36,6 +36,8 @@
   const EXAM_READ_KEY = 'ronshoExamReadV1';
   // 利用者が手元の百選から取り込んだ目次（js/exam-refs.js、v33.0〜）
   const HYAKUSEN_TOC_KEY = 'ronshoHyakusenTocV1';
+  // 過去問の資料（問題・出題趣旨・採点実感）に引いたマーカー（js/exam-marks.js、v34.0〜）
+  const EXAM_MARKS_KEY = 'ronshoExamMarksV1';
   // 編集競合でマージした論証タイトルの記録。バナー→重複チェックで確認する
   // ためのもので、他端末でも同じバナーが出るよう同期対象に含める
   const SYNC_CONFLICTS_KEY = 'ronshoSyncConflictsV1';
@@ -80,6 +82,7 @@
     lawRefView: '📜 条文リンク表示',
     examRead: '📄 過去問の資料の「読んだ」印',
     hyakusenToc: '📚 百選の目次',
+    examMarks: '🖍 過去問の資料のマーカー',
     orphanEntryArchive: '🔗 引き継がれなかった学習記録の内容',
     theme: '🌓 表示テーマ',
     petEnabled: '🐾 ペット表示設定',
@@ -172,6 +175,7 @@
     lawRefView: readRaw(LAWREF_VIEW_KEY, ''),
     examRead: read(EXAM_READ_KEY, {}),
     hyakusenToc: read(HYAKUSEN_TOC_KEY, []),
+    examMarks: read(EXAM_MARKS_KEY, {}),
     theme: readRaw(THEME_KEY, ''),
     petEnabled: readRaw(PET_ENABLED_KEY, ''),
     petSpecies: readRaw(PET_SPECIES_KEY, ''),
@@ -252,6 +256,7 @@
       writeRaw(LAWREF_VIEW_KEY, data.lawRefView);
       write(EXAM_READ_KEY, data.examRead && typeof data.examRead === 'object' && !Array.isArray(data.examRead) ? data.examRead : {});
       write(HYAKUSEN_TOC_KEY, Array.isArray(data.hyakusenToc) ? data.hyakusenToc : []);
+      write(EXAM_MARKS_KEY, data.examMarks && typeof data.examMarks === 'object' && !Array.isArray(data.examMarks) ? data.examMarks : {});
       writeRaw(THEME_KEY, data.theme);
       writeRaw(PET_ENABLED_KEY, data.petEnabled);
       writeRaw(PET_SPECIES_KEY, data.petSpecies);
