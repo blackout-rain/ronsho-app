@@ -1042,6 +1042,32 @@ console.log('\n■ 開いた条文の回数・お気に入り（v34.1）');
     && /renderLawHistoryIfShown/.test(read('drive-sync.js')));
 }
 
+console.log('\n■ 過去問ログ：消した印・付けた時刻（v34.2）');
+{
+  const pe = loadApp(['js/core.js', 'js/past-exam.js']);
+  const T = 1700000000000;
+  pe('localStorage.clear()');
+  pe('upsertPastExamLogEntry("司法試験", "民法", "令和7年", 1, "2026-11-20")');
+  const logs1 = pe('loadPastExamLogs()');
+  check('付けたログに時刻（at）が入る', logs1.length === 1 && typeof logs1[0].at === 'number' && logs1[0].at > 0, JSON.stringify(logs1));
+  const key = logs1[0].key;
+  check('ログを消せる', pe('deletePastExamLog')(key, T + 100) === true && pe('loadPastExamLogs()').length === 0);
+  eq('消した印に、消したログのkeyと時刻が残る', JSON.parse(pe("localStorage.getItem('ronshoPastExamDeletedV1')")), { [key]: T + 100 });
+  eq('無いログを消しても何もしない', pe('deletePastExamLog')('無い|ログ', T + 200), false);
+  eq('印は新しい方の時刻にする（時刻が戻らない）', (pe('deletePastExamLog')(key, T + 50), JSON.parse(pe("localStorage.getItem('ronshoPastExamDeletedV1')"))[key]), T + 100);
+  // バックアップから戻す：消した印のあるログは、付け直した扱いにする
+  pe('restorePastExamLogsFromBackup')([{ key, examType: '司法試験', subject: '民法', year: '令和7年', round: 1, date: '2026-11-20', memo: 'x' }, { examType: '予備試験', subject: '刑法', year: '令和6年', round: 1, date: '2026-11-01', memo: '' }], { 'a|b': T + 5 }, T + 1000);
+  const restored = pe('loadPastExamLogs()');
+  check('戻したログのうち、消した印のあるものは時刻を消した時より新しくする', restored.find(l => l.key === key).at === T + 1000, JSON.stringify(restored));
+  check('消した印の無いログは時刻を変えない', restored.find(l => l.subject === '刑法').at === undefined);
+  check('バックアップの消した印も合わせて残す', JSON.parse(pe("localStorage.getItem('ronshoPastExamDeletedV1')"))['a|b'] === T + 5);
+  // 画面のつながり（ソースの確認）
+  const studyJs = read('js/study-table.js'), pastJs = read('js/past-exam.js');
+  check('学習カレンダーから消すときも、消した印を残す', /deletePastExamLog\(key\)/.test(studyJs) && !/logs\.splice\(idx, 1\);\s*savePastExamLogs/.test(studyJs));
+  check('過去問ログの表から消すときも、消した印を残す', /deletePastExamLog\(delBtn\.dataset\.key\)/.test(pastJs));
+  check('メモを変えたら時刻を新しくする', /logs\[idx\]\.memo = memo;\s*logs\[idx\]\.at = Date\.now\(\);/.test(pastJs));
+}
+
 runAsyncChecks().catch(e => check('非同期のチェックを実行できる', false, e && e.stack)).then(() => {
   console.log('');
   if (failures > 0) {

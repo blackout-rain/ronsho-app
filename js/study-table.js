@@ -1159,12 +1159,8 @@ document.addEventListener('click', (e) => {
   const deleteExamBtn = e.target.closest('.deleteExamDayItemBtn');
   if (deleteExamBtn) {
     const key = deleteExamBtn.dataset.key;
-    if (typeof loadPastExamLogs === 'function' && typeof savePastExamLogs === 'function') {
-      const logs = loadPastExamLogs();
-      const idx = logs.findIndex(l => l.key === key);
-      if (idx !== -1) {
-        logs.splice(idx, 1);
-        savePastExamLogs(logs);
+    if (typeof deletePastExamLog === 'function') {
+      if (deletePastExamLog(key)) {
         renderCalendar();
         if (typeof renderPastLogs === 'function') renderPastLogs();
         if (typeof renderPastMatrixTable === 'function') renderPastMatrixTable();

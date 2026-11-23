@@ -209,7 +209,9 @@ function restoreFromBackupPayload(data) {
   saveSpeechDict();
   saveOrphanEntryArchive();
   savePrecedents();
-  savePastExamLogs(Array.isArray(data.pastExamLogs) ? data.pastExamLogs : []);
+  // 過去問ログ（v34.2〜は消した印も）。消した印は古いバックアップには無い
+  if (typeof restorePastExamLogsFromBackup === 'function') restorePastExamLogsFromBackup(data.pastExamLogs, data.pastExamDeleted);
+  else savePastExamLogs(Array.isArray(data.pastExamLogs) ? data.pastExamLogs : []);
   saveCountdowns(Array.isArray(data.countdowns) ? data.countdowns : []);
   if (data.dailyGoal) saveDailyGoal(data.dailyGoal);
   if (data.weeklyGoal && typeof saveWeeklyGoal === 'function') saveWeeklyGoal(data.weeklyGoal);

@@ -732,10 +732,145 @@ async function lawHistoryTest() {
   }
 }
 
+async function pastExamLogsTest() {
+  const PE = 'ronshoPastExamLogs_v1', PD = 'ronshoPastExamDeletedV1';
+  const T = 1700000000000;
+  const canon = x => loadDevice(null).api.canonicalJSON(x);
+  const api0 = loadDevice(null).api;
+  const merge = (a, b, da, db) => api0.mergePastExamLogs(a, b, da || {}, db || {});
+  const log = (subject, year, date, extra) => Object.assign({ key: '司法試験|' + subject + '|' + year + '|1|' + date, examType: '司法試験', subject, year, round: 1, date, memo: '' }, extra || {});
+  const subjects = list => (list || []).map(l => l.subject).sort();
+  const eq = (label, actual, expected) => check(label, canon(actual) === canon(expected), JSON.stringify(actual));
+
+  console.log('\n■ P1: 過去問ログの足し合わせのきまり（順番・回数によらず同じ結果）');
+  {
+    const a = [log('民法', '令和7年', '2026-11-20', { at: T + 10, memo: '古いメモ' }), log('刑法', '令和6年', '2026-11-01', { at: T })];
+    const b = [log('民法', '令和7年', '2026-11-20', { at: T + 20, memo: '新しいメモ' }), log('憲法', '令和5年', '2026-10-01')];
+    const ab = merge(a, b), ba = merge(b, a);
+    check('どちらから合わせても同じ', canon(ab) === canon(ba));
+    check('何度合わせても同じ', canon(merge(ab, b)) === canon(ab) && canon(merge(ab, ab)) === canon(ab));
+    eq('片方にしかないログも残る', subjects(ab), ['刑法', '憲法', '民法']);
+    eq('同じログは、時刻の新しい方のメモを採る', ab.find(l => l.subject === '民法').memo, '新しいメモ');
+    eq('時刻が同じ（古いログで時刻が無い）ときは、メモの長い方', merge([log('民法', 'R7', 'd', { memo: '' })], [log('民法', 'R7', 'd', { memo: 'あり' })])[0].memo, 'あり');
+    const del = { pastExamDeleted: { [log('刑法', '令和6年', '2026-11-01').key]: T + 5 } };
+    eq('消した印より前のログは、どちらにあっても入れない', subjects(merge(a, b, del, {})), ['憲法', '民法']);
+    eq('消した印は相手側のものでも効く', subjects(merge(a, b, {}, del)), ['憲法', '民法']);
+    const readded = [log('刑法', '令和6年', '2026-11-01', { at: T + 9 })];
+    eq('消した後に付け直したログは入る', subjects(merge(readded, [], del, {})), ['刑法']);
+    eq('時刻の無い古いログも、消した印があれば消える', merge([log('憲法', '令和5年', '2026-10-01')], [], { pastExamDeleted: { [log('憲法', '令和5年', '2026-10-01').key]: 1 } }, {}), []);
+    eq('keyの無い古いログにもkeyを付けて合わせる', merge([{ subject: '民法', year: '令和7年', round: 1, date: 'd' }], [{ examType: '予備試験', subject: '民法', year: '令和7年', round: 1, date: 'd', key: '予備試験|民法|令和7年|1|d' }]).length, 1);
+    check('おかしな値（null・配列でない）でも止まらない', canon(merge(null, 'x')) === '[]' && merge([null, 3, log('民法', 'R7', 'd')], {}).length === 1);
+    const md = api0.mergePastExamDeleted;
+    eq('消した印は、新しい方の時刻を残す', md({ a: T, b: T + 1 }, { a: T + 3 }), { a: T + 3, b: T + 1 });
+  }
+
+  // 2台（iPad・パソコン）が同じクラウドから始める
+  const twoDevices = async () => {
+    const gas = makeMockGas(makeCloudStore([mkEntry('民法A', '本文A', '民法')], 10));
+    const ipad = loadDevice(gas); await ipad.api.pullFromCloud(true);
+    const pc = loadDevice(gas); await pc.api.pullFromCloud(true);
+    return { gas, ipad, pc };
+  };
+
+  console.log('\n■ P2: 2台の両方で同期の前に過去問ログを付けた → 確認ポップアップを出さず、両方のログを残す（v34.1までは片方が消えていた）');
+  {
+    const { gas, ipad, pc } = await twoDevices();
+    ipad.setLocal(PE, [log('民法', '令和7年', '2026-11-20', { at: T + 1 })]);
+    await ipad.api.pushToCloud();
+    pc.setLocal(PE, [log('刑法', '令和6年', '2026-11-21', { at: T + 2 })]);
+    await pc.api.pullFromCloud(false);
+    check('確認ポップアップは出ない', pc.getEl('driveSyncConflictModal').innerHTML === '');
+    eq('パソコンに両方のログがある', subjects(pc.getLocal(PE, [])), ['刑法', '民法']);
+    await pc.api.pushToCloud();
+    eq('クラウドにも両方のログがある', subjects(gas.store.data.pastExamLogs), ['刑法', '民法']);
+    await ipad.api.pullFromCloud(false);
+    eq('iPadにも両方のログがある', subjects(ipad.getLocal(PE, [])), ['刑法', '民法']);
+  }
+
+  console.log('\n■ P3: 論証も両方で変わった本当の競合 → ポップアップで「その他の項目」をどちらにしても、ログは両方残る');
+  for (const side of ['local', 'cloud']) {
+    const { gas, ipad, pc } = await twoDevices();
+    ipad.setLocal(PE, [log('民法', '令和7年', '2026-11-20', { at: T + 1 })]);
+    ipad.setLocal(K.entries, [mkEntry('民法A', 'iPadの本文', '民法')]);
+    await ipad.api.pushToCloud();
+    pc.setLocal(PE, [log('刑法', '令和6年', '2026-11-21', { at: T + 2 })]);
+    pc.setLocal(K.entries, [mkEntry('民法A', 'パソコンの本文', '民法')]);
+    await pc.api.pullFromCloud(false);
+    check('[' + side + '] 確認ポップアップが出る', pc.getEl('driveSyncConflictModal').innerHTML !== '');
+    check('[' + side + '] 「その他の項目」に過去問ログは出さない', !/過去問ログ/.test(pc.getEl('driveSyncConflictModal').innerHTML));
+    const remote = gas.store.data;
+    const local = pc.api.snapshot();
+    const merged = pc.api.buildManualMergeSnapshot(pc.api.computeSyncDiff(local, remote), local, remote, new Map(), side);
+    eq('[' + side + '] 合わせた結果に両方のログがある', subjects(merged.pastExamLogs), ['刑法', '民法']);
+  }
+
+  console.log('\n■ P4: 学習中の自動同期（この端末を優先）でも、ほかの端末のログは消えない');
+  {
+    const { gas, ipad, pc } = await twoDevices();
+    ipad.setLocal(PE, [log('民法', '令和7年', '2026-11-20', { at: T + 1 })]);
+    await ipad.api.pushToCloud();
+    pc.setLocal(PE, [log('刑法', '令和6年', '2026-11-21', { at: T + 2 })]);
+    pc.setLocal(K.studyLog, { '民法A': { count: 1, updatedAt: new Date().toISOString() } });
+    check('学習中と判定される', pc.api.isActivelyStudying() === true);
+    pc.setLocal(K.entries, [mkEntry('民法A', 'パソコンの本文', '民法')]);
+    ipad.setLocal(K.entries, [mkEntry('民法A', 'iPadの本文', '民法')]);
+    await ipad.api.pushToCloud();
+    await pc.api.pullFromCloud(false);
+    eq('クラウドに両方のログがある', subjects(gas.store.data.pastExamLogs), ['刑法', '民法']);
+    eq('パソコンにも両方のログがある', subjects(pc.getLocal(PE, [])), ['刑法', '民法']);
+  }
+
+  console.log('\n■ P5: 片方の端末で消したログは、ほかの端末から戻ってこない');
+  {
+    const { gas, ipad, pc } = await twoDevices();
+    const x = log('民法', '令和7年', '2026-11-20', { at: T + 1 });
+    ipad.setLocal(PE, [x]);
+    await ipad.api.pushToCloud();
+    await pc.api.pullFromCloud(false);
+    eq('はじめは両方にある', subjects(pc.getLocal(PE, [])), ['民法']);
+    // iPad で消す（印を残す）
+    ipad.setLocal(PE, []);
+    ipad.setLocal(PD, { [x.key]: T + 100 });
+    await ipad.api.pushToCloud();
+    // パソコンは消したことを知らずに別のログを付けていた
+    pc.setLocal(PE, [x, log('刑法', '令和6年', '2026-11-21', { at: T + 200 })]);
+    await pc.api.pullFromCloud(false);
+    check('確認ポップアップは出ない', pc.getEl('driveSyncConflictModal').innerHTML === '');
+    eq('パソコンでも消える（付けたログは残る）', subjects(pc.getLocal(PE, [])), ['刑法']);
+    await pc.api.pushToCloud();
+    eq('クラウドでも消えたまま', subjects(gas.store.data.pastExamLogs), ['刑法']);
+    // 何も変えていない端末がクラウドを丸ごと採るときも、戻さない
+    const pc2 = loadDevice(gas);
+    pc2.setLocal(K.entries, [mkEntry('民法A', '本文A', '民法')]);
+    pc2.setLocal(PE, [x]);
+    pc2.api.setRevision(1);
+    pc2.api.markSynced(pc2.api.snapshot());
+    await pc2.api.pullFromCloud(false);
+    eq('丸ごと採るときも、消したログは戻らない', subjects(pc2.getLocal(PE, [])), ['刑法']);
+  }
+
+  console.log('\n■ P6: 古い版のアプリが送った（消した印の無い）データでも、この端末の印とログは残る');
+  {
+    const { gas, pc } = await twoDevices();
+    const x = log('民法', '令和7年', '2026-11-20', { at: T + 1 });
+    pc.setLocal(PE, [log('刑法', '令和6年', '2026-11-21', { at: T + 2 })]);
+    pc.setLocal(PD, { [x.key]: T + 100 });
+    pc.api.markSynced(pc.api.snapshot());
+    gas.store.data = Object.assign({}, gas.store.data, { pastExamLogs: [x, log('憲法', '令和5年', '2026-10-01')] });
+    delete gas.store.data.pastExamDeleted;
+    gas.store.revision += 1;
+    await pc.api.pullFromCloud(false);
+    eq('消した印は残る', pc.getLocal(PD, {}), { [x.key]: T + 100 });
+    eq('この端末のログ＋クラウドのログ（消したものは除く）', subjects(pc.getLocal(PE, [])), ['刑法', '憲法']);
+    check('足し合わせた結果は送り直す変更として残る', pc.api.hasUnsyncedLocalChanges() === true);
+  }
+}
+
 (async () => {
   await e2e();
   await speechDarkPauseTest();
   await lawHistoryTest();
+  await pastExamLogsTest();
   console.log('\n' + (failures === 0 ? '🎉 全チェック合格' : `⚠️ ${failures}件のチェックが不合格`));
   process.exit(failures === 0 ? 0 : 1);
 })();
