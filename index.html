@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>論証集アプリ v34.0（過去問の資料にマーカー・段落の頭を1字下げ）</title>
+<title>論証集アプリ v34.1（開いた条文の回数・お気に入りを端末間で同期）</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0057e7">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@ try {
 <script src="vendor/jszip/jszip.min.js"></script><link rel="stylesheet" href="style.css">
 </head>
 <body>
-<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v34.0</span></h1>
+<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v34.1</span></h1>
 <div id="status"></div>
 <div id="syncConflictBanner" class="syncConflictBanner"></div>
 <div id="backupReminderBanner" class="backupReminderBanner"></div>
@@ -350,7 +350,8 @@ try {
 </div>
 <div id="lawStockStockPane">
 <div class="dataIoSection oneLine">
-<span class="dupCheckIntro">論証本文の条文リンクから取得した条文がここに集まります。オフラインでも確認できます。</span>
+<span class="dupCheckIntro">論証本文の条文リンクから開いた条文がここに集まります（開いた回数・☆はほかの端末と同期。一度開いた端末ではオフラインでも確認できます）。</span>
+<button type="button" id="lawStockFavOnlyBtn" class="stackBtn lawStockFavOnlyBtn">☆ お気に入りだけ</button>
 <button type="button" id="lawStockClearBtn" class="stackBtn">🗑️ すべて削除</button>
 </div>
 <div id="lawStockSubjectTabs" class="progressViewToggle" style="flex-wrap:wrap;"></div>

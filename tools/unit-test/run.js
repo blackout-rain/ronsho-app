@@ -338,7 +338,9 @@ console.log('\n■ localStorageキーの同期登録漏れ');
   // 他端末と揃える意味が無いため、意図的に同期対象から外しているキー（理由つき）
   const DEVICE_LOCAL_KEYS = {
     ronshoLastImportDiffV1: '直前のWord読み込みの差分表示（端末内の一時表示）',
-    ronshoLawCacheV1: 'e-Govから取得した条文のキャッシュ（再取得できる）',
+    ronshoLawCacheV1: 'e-Govから取得した条文のキャッシュ（再取得できる。開いた回数・☆は ronshoLawHistoryV1 で同期する）',
+    ronshoLawHistoryDeviceV1: '開いた回数を端末ごとに数えるための、この端末の名札（端末ごとに違うことに意味がある）',
+    ronshoLawHistoryMigratedV1: 'v34.0までの「開いた条文」（この端末のキャッシュ）を記録に移したかの印（端末ごとの内部管理）',
     ronshoLawFullDB: '全条ダウンロードの保存先（IndexedDBの名前。約10MBあり、各端末で再ダウンロードできる）',
     ronshoPastMatrixEraV1: '過去問マトリクスの令和/平成の表示切替（見た目だけ）',
     ronshoSpeechVoiceV1: '読み上げの声（端末に入っている声の一覧が端末ごとに違い、他の端末では同じ声が無いことが多い）',
@@ -961,6 +963,83 @@ console.log('\n■ 出題趣旨の条文・判例：読み取り・索引・照�
   check('索引とスクリプトをオフライン用に先に取っておく', /'\.\/js\/exam-refs\.js'/.test(sw) && /'\.\/data\/exam\/refs\.json'/.test(sw));
   check('index.html で exam-refs.js を exam-docs.js の後に読む', html.indexOf('js/exam-refs.js') > html.indexOf('js/exam-docs.js'));
   check('百選の目次はアプリに入れない（取り込んだものだけ使う）', !fs.existsSync(path.join(ROOT, 'data', 'hyakusen')) && !/百選[^\n]{0,30}\d+事件/.test(read('data/exam/refs.json')));
+}
+
+console.log('\n■ 開いた条文の回数・お気に入り（v34.1）');
+{
+  // 時刻はすべて引数で固定する（どの日に実行しても同じ結果になるように）
+  const T = 1700000000000;
+  const lw = loadApp(['js/core.js', 'js/lawref.js']);
+  lw('localStorage.clear()');
+  let notified = 0;
+  lw('window').ronshoSyncNotifyChange = () => { notified++; };
+  const hist = () => JSON.parse(lw("localStorage.getItem('ronshoLawHistoryV1')") || '{}');
+  const dev = lw('lawHistoryDeviceId()');
+  check('端末の名札を作り、次も同じものを使う', /^[a-z0-9]{6,32}$/.test(dev) && lw('lawHistoryDeviceId()') === dev);
+  lw('lawHistoryRecordOpen("minpou", 709, null, ' + T + ')');
+  lw('lawHistoryRecordOpen("minpou", 709, null, ' + (T + 1000) + ')');
+  lw('lawHistoryRecordOpen("keiho", 199, null, ' + (T + 2000) + ')');
+  lw('lawHistoryRecordOpen("minpou", 121, 2, ' + (T + 3000) + ')');
+  const h1 = hist();
+  eq('開いた回数を端末ごとに数える', h1['minpou|709'].c[dev], { n: 2, at: T + 1000 });
+  eq('枝番号つきの条文も記録する', Object.keys(h1).sort(), ['keiho|199', 'minpou|121-2', 'minpou|709']);
+  check('記録が変わるたびに同期に知らせる', notified === 4, notified + '回');
+  check('条文の文は記録に入れない（番号と回数だけ）', !/paras|caption|text/.test(JSON.stringify(h1)));
+  eq('ほかの端末の回数も足す', lw('lawHistoryCount')({ c: { a: { n: 2, at: T }, b: { n: 3, at: T + 5 } } }), 5);
+  eq('最後に開いた時刻は全端末の中でいちばん新しいもの', lw('lawHistoryLastAt')({ c: { a: { n: 2, at: T }, b: { n: 3, at: T + 5 } } }), T + 5);
+  eq('消した時刻より前に開いた回数は数えない', lw('lawHistoryCount')({ c: { a: { n: 2, at: T }, b: { n: 3, at: T + 5 } }, del: T + 1 }), 3);
+  // 一覧（条番号順のまま。文はこの端末の控えにあれば添える）
+  lw('localStorage.setItem("ronshoLawCacheV1", JSON.stringify({ "minpou|709": { at: 1, caption: "（不法行為による損害賠償）", paras: [{ text: "故意又は過失によって…" }] } }))');
+  const list = lw('lawrefStockList()');
+  eq('一覧は科目→法律→条番号の順', list.map(x => x.key), ['minpou|121-2', 'minpou|709', 'keiho|199']);
+  const m709 = list.find(x => x.key === 'minpou|709');
+  check('一覧に回数と最後に開いた時刻がつく', m709.count === 2 && m709.lastAt === T + 1000);
+  check('文の控えがあれば見出しを添え、無ければ「文がない」とわかる', m709.hasText && m709.caption === '（不法行為による損害賠償）' && list.find(x => x.key === 'keiho|199').hasText === false);
+  // ☆
+  check('☆を付ける', lw('lawHistoryToggleFav("keiho|199", ' + (T + 4000) + ')') === true && hist()['keiho|199'].fav === true);
+  check('☆の変えた時刻を残す（同期で新しい方を採るため）', hist()['keiho|199'].favAt === T + 4000);
+  check('☆を外す', lw('lawHistoryToggleFav("keiho|199", ' + (T + 5000) + ')') === false && !hist()['keiho|199'].fav && hist()['keiho|199'].favAt === T + 5000);
+  lw('lawHistoryToggleFav("keiho|199", ' + (T + 6000) + ')');
+  // 削除
+  lw('lawHistoryDelete("minpou|709", ' + (T + 7000) + ')');
+  check('削除すると一覧から消え、印（del）だけ残る', !lw('lawrefStockList()').some(x => x.key === 'minpou|709') && hist()['minpou|709'].del === T + 7000 && !!hist()['minpou|709'].c);
+  lw('lawHistoryRecordOpen("minpou", 709, null, ' + (T + 8000) + ')');
+  eq('削除した後にまた開くと、1回目から数え直す', lw('lawHistoryCount')(hist()['minpou|709']), 1);
+  lw('lawHistoryRecordOpen("minpou", 90, null, ' + (T + 8200) + ')');
+  lw('lawHistoryDelete("minpou|90", ' + (T + 8500) + ')');
+  check('削除の前提：消えている', lw('lawHistoryCount')(hist()['minpou|90']) === 0);
+  lw('lawHistoryRecordOpen("minpou", 90, null, ' + (T + 100) + ')');
+  check('時計が戻っていても、削除の後に開いた分は数える', lw('lawHistoryCount')(hist()['minpou|90']) === 1 && hist()['minpou|90'].c[dev].at > T + 8500);
+  // すべて削除（☆は残す）
+  const removed = lw('lawHistoryClearUnfav(' + (T + 9000) + ')');
+  eq('すべて削除は☆以外を消す', [...removed].sort(), ['minpou|121-2', 'minpou|709', 'minpou|90']);
+  eq('☆の条文は残る（開いた回数が0でも出る）', lw('lawrefStockList()').map(x => x.key + ':' + x.fav), ['keiho|199:true']);
+  const favDel = lw('lawHistoryLoad()');
+  lw('lawHistoryRemove')(favDel, 'keiho|199', T + 9500);
+  check('☆の条文を一覧から削除すると☆も外れる', !favDel['keiho|199'].fav && favDel['keiho|199'].favAt === T + 9500);
+
+  // v34.0までの「開いた条文」（この端末のキャッシュ）を、1回だけ記録に移す
+  const mg = loadApp(['js/core.js', 'js/lawref.js']);
+  mg('localStorage.clear()');
+  mg('localStorage.setItem("ronshoLawCacheV1", JSON.stringify({ "minpou|1": { at: 100 }, "keiho|38": { at: 200 }, "kaishahou|429": { at: 300 } }))');
+  mg('localStorage.setItem("ronshoLawHistoryV1", JSON.stringify({ "keiho|38": { del: 500 } }))');
+  check('移すのは1回目だけ', mg('lawHistoryMigrateFromCache()') === true && mg('lawHistoryMigrateFromCache()') === false);
+  const mh = JSON.parse(mg("localStorage.getItem('ronshoLawHistoryV1')"));
+  const mdev = mg('lawHistoryDeviceId()');
+  eq('キャッシュの条文を「1回開いた」として記録する', [mh['minpou|1'].c[mdev], mh['kaishahou|429'].c[mdev]], [{ n: 1, at: 100 }, { n: 1, at: 300 }]);
+  check('ほかの端末で削除された条文は戻さない', !mh['keiho|38'].c);
+  check('移した印は端末ごと（同期しない）', mg("localStorage.getItem('ronshoLawHistoryMigratedV1')") === '1');
+
+  // 画面のつながり（ソースの確認）
+  const lawJs = read('js/lawref.js');
+  const html = read('index.html');
+  check('ポップアップで条文が出たら数える', /body\.innerHTML = lawrefArticleBodyHtml\(data, para\);[\s\S]{0,80}lawHistoryNoteOpened\(lid, num, branch\)/.test(lawJs));
+  check('その場に展開で条文が出たら数える', /lawRefInlineBody'\)\.innerHTML = lawrefArticleBodyHtml\(data, para\);\s*lawHistoryNoteOpened\(lid, num, branch\)/.test(lawJs));
+  check('取得に失敗したときは数えない', !/catch\(err => \{[^}]*lawHistoryNoteOpened/.test(lawJs));
+  check('開いた条文の画面に「お気に入りだけ」のボタン', /id="lawStockFavOnlyBtn"/.test(html));
+  check('一覧のカードに☆のボタン', /lawStockFavBtn/.test(lawJs) && /aria-pressed/.test(lawJs));
+  check('同期で記録が変わったら一覧だけ描き直す（全条を読むは描き直さない）', /function renderLawHistoryIfShown\(\) \{\s*if \(lawStockMode === 'stock'\) renderLawStockPage\(\);/.test(lawJs)
+    && /renderLawHistoryIfShown/.test(read('drive-sync.js')));
 }
 
 runAsyncChecks().catch(e => check('非同期のチェックを実行できる', false, e && e.stack)).then(() => {

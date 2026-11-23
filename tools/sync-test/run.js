@@ -593,9 +593,149 @@ async function speechDarkPauseTest() {
   check('documentElement が無い環境でも止まらない', dev.api.isSpeechDarkActive() === false);
 }
 
+// 条文タブ「📜 開いた条文」の記録（ronshoLawHistoryV1、v34.1〜）は、確認ポップアップを出さず自動で足し合わせる
+async function lawHistoryTest() {
+  const LH = 'ronshoLawHistoryV1';
+  const T = 1700000000000;
+  const canon = x => loadDevice(null).api.canonicalJSON(x);
+  const merge = loadDevice(null).api.mergeLawHistory;
+  // 論証などは端末と同じで、開いた条文の記録だけが違うクラウドのデータを作る
+  const cloudLike = (entries, lawHistory, revision) => {
+    const seed = loadDevice(null);
+    seed.setLocal(K.entries, entries);
+    const data = seed.api.snapshot();
+    data.lawHistory = lawHistory;
+    return { revision, updatedAt: '2026-08-25T00:00:00.000Z', data };
+  };
+  console.log('\n■ L1: 足し合わせのきまり（順番・回数によらず同じ結果）');
+  {
+    const a = { 'minpou|709': { c: { A: { n: 3, at: T + 30 }, B: { n: 1, at: T + 10 } } }, 'keiho|199': { c: { A: { n: 1, at: T } }, fav: true, favAt: T + 1 } };
+    const b = { 'minpou|709': { c: { B: { n: 4, at: T + 40 } }, del: T + 20 }, 'keiho|199': { c: { A: { n: 1, at: T } }, favAt: T + 5 }, 'kenpou|9': { c: { B: { n: 1, at: T } } } };
+    const ab = merge(a, b), ba = merge(b, a);
+    check('どちらから合わせても同じ', canon(ab) === canon(ba));
+    check('何度合わせても同じ', canon(merge(ab, b)) === canon(ab) && canon(merge(ab, ab)) === canon(ab));
+    check('端末ごとの回数は、時刻の新しい方を採る', ab['minpou|709'].c.B.n === 4 && ab['minpou|709'].c.A.n === 3);
+    check('削除の印は新しい方を残す', ab['minpou|709'].del === T + 20);
+    check('☆は、変えた時刻の新しい方（外した方）を採る', !ab['keiho|199'].fav && ab['keiho|199'].favAt === T + 5);
+    check('片方にしかない条文も残る', !!ab['kenpou|9']);
+    check('おかしな値（配列・null）でも止まらない', canon(merge(null, [])) === '{}' && !!merge({ x: null }, { x: { c: [] } }).x);
+  }
+
+  console.log('\n■ L2: 2台で同期の前に条文を開いた（記録だけが違う）→ 確認ポップアップを出さず、足し合わせて送る（pullFromCloud）');
+  {
+    const cloud = cloudLike([mkEntry('民法A', '本文A', '民法')], { 'minpou|709': { c: { B: { n: 2, at: T + 50 } } }, 'keiho|199': { c: { B: { n: 1, at: T + 60 } } } }, 11);
+    const gas = makeMockGas(cloud);
+    const dev = loadDevice(gas);
+    dev.setLocal(K.entries, [mkEntry('民法A', '本文A', '民法')]);
+    dev.setLocal(LH, { 'minpou|709': { c: { B: { n: 1, at: T + 5 } } } });
+    dev.api.setRevision(10);
+    dev.api.markSynced(dev.api.snapshot());
+    dev.setLocal(LH, { 'minpou|709': { c: { A: { n: 1, at: T + 70 }, B: { n: 1, at: T + 5 } } } });
+    await dev.api.pullFromCloud(false);
+    check('確認ポップアップは出ない', dev.getEl('driveSyncConflictModal').innerHTML === '');
+    const local = dev.getLocal(LH, {});
+    check('この端末の記録が、2台ぶんの足し合わせになる', local['minpou|709'].c.A.n === 1 && local['minpou|709'].c.B.n === 2 && !!local['keiho|199']);
+    check('クラウドのrevisionに合わせる', dev.api.getRevision() === 11);
+    check('足し合わせた結果は、まだ送っていない変更として残る', dev.api.hasUnsyncedLocalChanges() === true);
+    await dev.api.pushToCloud();
+    check('送るとクラウドも足し合わせた結果になる', canon(gas.store.data.lawHistory) === canon(local) && gas.store.revision === 12);
+    check('送った後は未同期の変更なし', dev.api.hasUnsyncedLocalChanges() === false);
+  }
+
+  console.log('\n■ L3: 送る直前にほかの端末が送っていた（記録だけが違う）→ 確認ポップアップを出さず、足し合わせて送り直す（pushToCloud）');
+  {
+    const cloud = cloudLike([mkEntry('民法A', '本文A', '民法')], { 'kenpou|21': { c: { B: { n: 1, at: T + 50 } } } }, 11);
+    const gas = makeMockGas(cloud);
+    const dev = loadDevice(gas);
+    dev.setLocal(K.entries, [mkEntry('民法A', '本文A', '民法')]);
+    dev.api.setRevision(10);
+    dev.api.markSynced(dev.api.snapshot());
+    dev.setLocal(LH, { 'minpou|1': { c: { A: { n: 1, at: T + 70 } } } });
+    await dev.api.pushToCloud();
+    check('確認ポップアップは出ない', dev.getEl('driveSyncConflictModal').innerHTML === '');
+    check('この端末に、ほかの端末の記録も入る', !!dev.getLocal(LH, {})['kenpou|21'] && !!dev.getLocal(LH, {})['minpou|1']);
+    await dev.api.pushToCloud();
+    check('送り直すと、クラウドに両方の記録が入る', !!gas.store.data.lawHistory['kenpou|21'] && !!gas.store.data.lawHistory['minpou|1']);
+  }
+
+  console.log('\n■ L4: 論証も食い違う本当の競合 → 確認ポップアップには記録を「違う項目」として出さず、どちらを選んでも記録は足し合わせる');
+  {
+    const cloud = makeCloudStore([mkEntry('民法A', '本文A', '民法'), mkEntry('クラウド側の新規', '本文cloud', '民法')], 11);
+    cloud.data.lawHistory = { 'kenpou|21': { c: { B: { n: 1, at: T + 50 } } } };
+    const gas = makeMockGas(cloud);
+    const dev = loadDevice(gas);
+    dev.setLocal(K.entries, [mkEntry('民法A', '本文A', '民法')]);
+    dev.api.setRevision(10);
+    dev.api.markSynced(dev.api.snapshot());
+    dev.setLocal(K.entries, [mkEntry('民法A', '本文A', '民法'), mkEntry('端末側の新規', '本文local', '民法')]);
+    dev.setLocal(LH, { 'minpou|1': { c: { A: { n: 1, at: T + 70 } } } });
+    await dev.api.pullFromCloud(false);
+    const html = dev.getEl('driveSyncConflictModal').innerHTML;
+    check('確認ポップアップは出る（論証が違うため）', html.includes('driveSyncConfirmMergeBtn'));
+    check('開いた条文は「違う項目」に出さない', !html.includes('開いた条文'));
+    dev.getEl('driveSyncQuickAllCloudBtn').onclick();
+    const otherCloud = dev.getEl('driveSyncOtherFieldsChoice');
+    await dev.getEl('driveSyncConfirmMergeBtn').onclick();
+    check('「すべてクラウド」を選んでも、この端末の記録は残り、クラウドにも入る',
+      !!gas.store.data.lawHistory['minpou|1'] && !!gas.store.data.lawHistory['kenpou|21'] && !!dev.getLocal(LH, {})['minpou|1'], otherCloud ? '' : '');
+  }
+
+  console.log('\n■ L5: 古い版のアプリが送ったデータ（記録の項目が無い）を丸ごと採用しても、この端末の記録は消えない');
+  {
+    const cloud = makeCloudStore([mkEntry('民法A', '本文A', '民法'), mkEntry('民法B', '本文B', '民法')], 11);
+    const gas = makeMockGas(cloud);
+    const dev = loadDevice(gas);
+    dev.setLocal(K.entries, [mkEntry('民法A', '本文A', '民法')]);
+    dev.setLocal(LH, { 'minpou|709': { c: { A: { n: 5, at: T } } } });
+    dev.api.setRevision(10);
+    dev.api.markSynced(dev.api.snapshot());
+    await dev.api.pullFromCloud(false);
+    check('クラウドの論証を採用する', dev.getLocal(K.entries, []).length === 2);
+    check('この端末の記録は残る', dev.getLocal(LH, {})['minpou|709'].c.A.n === 5);
+    check('記録をクラウドへ送り直す変更として残る', dev.api.hasUnsyncedLocalChanges() === true);
+  }
+
+  console.log('\n■ L6: ほかの端末で削除した条文は、この端末から戻らない');
+  {
+    const cloud = makeCloudStore([mkEntry('民法A', '本文A', '民法')], 10);
+    cloud.data.lawHistory = { 'minpou|709': { c: { A: { n: 2, at: T } } } };
+    const gas = makeMockGas(cloud);
+    const devA = loadDevice(gas);
+    await devA.api.pullFromCloud(true);
+    const devB = loadDevice(gas);
+    await devB.api.pullFromCloud(true);
+    // A で削除して送る
+    devA.setLocal(LH, { 'minpou|709': { c: { A: { n: 2, at: T } }, del: T + 100 } });
+    await devA.api.pushToCloud();
+    // B は同期の前に別の条文を開いていた
+    devB.setLocal(LH, { 'minpou|709': { c: { A: { n: 2, at: T } } }, 'keiho|1': { c: { B: { n: 1, at: T + 200 } } } });
+    await devB.api.pullFromCloud(false);
+    await devB.api.pushToCloud();
+    const item = gas.store.data.lawHistory['minpou|709'];
+    check('削除の印が残り、削除前に開いた回数は数えない形のまま', item.del === T + 100 && item.c.A.at <= item.del);
+    check('B で開いた条文はそのまま入る', !!gas.store.data.lawHistory['keiho|1']);
+    check('確認ポップアップは出ない', devB.getEl('driveSyncConflictModal').innerHTML === '');
+  }
+
+  console.log('\n■ L7: この端末に変更が無く、クラウドだけ記録が増えた → そのまま採用し、送り返さない');
+  {
+    const cloud = cloudLike([mkEntry('民法A', '本文A', '民法')], { 'minpou|709': { c: { A: { n: 1, at: T }, B: { n: 1, at: T + 9 } } } }, 11);
+    const gas = makeMockGas(cloud);
+    const dev = loadDevice(gas);
+    dev.setLocal(K.entries, [mkEntry('民法A', '本文A', '民法')]);
+    dev.setLocal(LH, { 'minpou|709': { c: { A: { n: 1, at: T } } } });
+    dev.api.setRevision(10);
+    dev.api.markSynced(dev.api.snapshot());
+    await dev.api.pullFromCloud(false);
+    check('クラウドの記録になる', dev.getLocal(LH, {})['minpou|709'].c.B.n === 1);
+    check('送り返す変更は無い（クラウドのrevisionは進まない）', dev.api.hasUnsyncedLocalChanges() === false && gas.store.revision === 11, 'revision=' + gas.store.revision);
+  }
+}
+
 (async () => {
   await e2e();
   await speechDarkPauseTest();
+  await lawHistoryTest();
   console.log('\n' + (failures === 0 ? '🎉 全チェック合格' : `⚠️ ${failures}件のチェックが不合格`));
   process.exit(failures === 0 ? 0 : 1);
 })();

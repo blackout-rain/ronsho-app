@@ -38,6 +38,10 @@
   const HYAKUSEN_TOC_KEY = 'ronshoHyakusenTocV1';
   // 過去問の資料（問題・出題趣旨・採点実感）に引いたマーカー（js/exam-marks.js、v34.0〜）
   const EXAM_MARKS_KEY = 'ronshoExamMarksV1';
+  // 条文タブ「📜 開いた条文」の一覧（開いた回数・☆）（js/lawref.js、v34.1〜）。
+  // 条文の文そのものは持たず、番号と回数だけ。条文を開くたびに変わるので、
+  // 2台の端末で両方変わっても確認ポップアップは出さず、自動で合わせる（mergeLawHistory）
+  const LAW_HISTORY_KEY = 'ronshoLawHistoryV1';
   // 編集競合でマージした論証タイトルの記録。バナー→重複チェックで確認する
   // ためのもので、他端末でも同じバナーが出るよう同期対象に含める
   const SYNC_CONFLICTS_KEY = 'ronshoSyncConflictsV1';
@@ -83,6 +87,7 @@
     examRead: '📄 過去問の資料の「読んだ」印',
     hyakusenToc: '📚 百選の目次',
     examMarks: '🖍 過去問の資料のマーカー',
+    lawHistory: '📜 開いた条文（回数・☆）',
     orphanEntryArchive: '🔗 引き継がれなかった学習記録の内容',
     theme: '🌓 表示テーマ',
     petEnabled: '🐾 ペット表示設定',
@@ -176,6 +181,7 @@
     examRead: read(EXAM_READ_KEY, {}),
     hyakusenToc: read(HYAKUSEN_TOC_KEY, []),
     examMarks: read(EXAM_MARKS_KEY, {}),
+    lawHistory: read(LAW_HISTORY_KEY, {}),
     theme: readRaw(THEME_KEY, ''),
     petEnabled: readRaw(PET_ENABLED_KEY, ''),
     petSpecies: readRaw(PET_SPECIES_KEY, ''),
@@ -224,6 +230,76 @@
     }
     return JSON.stringify(value);
   }
+  const isPlainObject = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  // --- 自動で合わせる項目（確認ポップアップの対象にしない）---
+  // 「📜 開いた条文」（ronshoLawHistoryV1）は、条文を開くたびに変わるため、
+  // 2台で両方変わるたびに確認ポップアップを出すと煩わしい。形を
+  //   { "minpou|709": { c: { 端末ID: { n: 開いた回数, at: 最後に開いた時刻 } },
+  //                     del: 削除した時刻, fav: ☆, favAt: ☆を変えた時刻 } }
+  // にしてあり、どの順で何度合わせても同じ結果になる（失うものが無い）ので、
+  // ここで常に足し合わせる。
+  //   ・端末ごとの回数（c）は、その端末だけが書くので、時刻の新しい方を採る
+  //   ・削除（del）は新しい方。削除した時刻より前に開いた回数は数えない（js/lawref.js）
+  //   ・☆は、変えた時刻の新しい方
+  function mergeLawHistory(a, b) {
+    a = isPlainObject(a) ? a : {};
+    b = isPlainObject(b) ? b : {};
+    const out = {};
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    keys.forEach(k => {
+      const x = isPlainObject(a[k]) ? a[k] : {};
+      const y = isPlainObject(b[k]) ? b[k] : {};
+      const item = {};
+      const c = {};
+      const cx = isPlainObject(x.c) ? x.c : {}, cy = isPlainObject(y.c) ? y.c : {};
+      new Set([...Object.keys(cx), ...Object.keys(cy)]).forEach(dev => {
+        const p = isPlainObject(cx[dev]) ? cx[dev] : null, q = isPlainObject(cy[dev]) ? cy[dev] : null;
+        let pick = p || q;
+        if (p && q) {
+          const pa = Number(p.at) || 0, qa = Number(q.at) || 0;
+          pick = pa !== qa ? (pa > qa ? p : q) : ((Number(p.n) || 0) >= (Number(q.n) || 0) ? p : q);
+        }
+        if (pick) c[dev] = { n: Number(pick.n) || 0, at: Number(pick.at) || 0 };
+      });
+      if (Object.keys(c).length) item.c = c;
+      const del = Math.max(Number(x.del) || 0, Number(y.del) || 0);
+      if (del) item.del = del;
+      const fx = Number(x.favAt) || 0, fy = Number(y.favAt) || 0;
+      const favSrc = fx !== fy ? (fx > fy ? x : y) : (x.fav ? x : y);
+      if (favSrc.fav) item.fav = true;
+      if (Math.max(fx, fy)) item.favAt = Math.max(fx, fy);
+      out[k] = item;
+    });
+    return out;
+  }
+  const AUTO_MERGED_FIELDS = { lawHistory: mergeLawHistory };
+  // data（保存・送信するもの）の自動で合わせる項目を、other と足し合わせたものに置き換える
+  function withAutoMerged(data, other) {
+    const out = Object.assign({}, data);
+    Object.keys(AUTO_MERGED_FIELDS).forEach(k => { out[k] = AUTO_MERGED_FIELDS[k](data && data[k], other && other[k]); });
+    return out;
+  }
+  // 自動で合わせる項目を、この端末に書き込む（同期フックは鳴らさない）
+  function writeAutoMergedLocal(merged) {
+    write(LAW_HISTORY_KEY, merged.lawHistory || {});
+    if (typeof renderLawHistoryIfShown === 'function') { try { renderLawHistoryIfShown(); } catch (_) {} }
+  }
+  // 論証などに実質の違いが無く、自動で合わせる項目だけが違っていた（または同じ）とき：
+  // この端末に足し合わせた結果を書き、クラウドのrevisionに合わせる。足し合わせた
+  // 結果がクラウドと違えば「未同期の変更あり」にして、あとで送る（queue）
+  function settleWithAutoMerged(localData, remoteData, remoteRevision) {
+    const merged = withAutoMerged(localData, remoteData);
+    writeAutoMergedLocal(merged);
+    revision = remoteRevision;
+    localStorage.setItem(REVISION_KEY, String(revision));
+    // 「最後に同期した状態」＝今のこの端末（足し合わせ後）の、自動で合わせる項目だけクラウドのもの
+    const asCloud = snapshot();
+    Object.keys(AUTO_MERGED_FIELDS).forEach(k => { asCloud[k] = AUTO_MERGED_FIELDS[k]((remoteData || {})[k], {}); });
+    markSynced(asCloud);
+    const needsPush = Object.keys(AUTO_MERGED_FIELDS).some(k => canonicalJSON(merged[k]) !== canonicalJSON(asCloud[k]));
+    if (needsPush) queue();
+    return needsPush;
+  }
   const markSynced = (snap) => {
     last = canonicalJSON(withoutVolatileFields(snap));
     localStorage.setItem(LAST_SYNCED_KEY, last);
@@ -257,6 +333,7 @@
       write(EXAM_READ_KEY, data.examRead && typeof data.examRead === 'object' && !Array.isArray(data.examRead) ? data.examRead : {});
       write(HYAKUSEN_TOC_KEY, Array.isArray(data.hyakusenToc) ? data.hyakusenToc : []);
       write(EXAM_MARKS_KEY, data.examMarks && typeof data.examMarks === 'object' && !Array.isArray(data.examMarks) ? data.examMarks : {});
+      write(LAW_HISTORY_KEY, isPlainObject(data.lawHistory) ? data.lawHistory : {});
       writeRaw(THEME_KEY, data.theme);
       writeRaw(PET_ENABLED_KEY, data.petEnabled);
       writeRaw(PET_SPECIES_KEY, data.petSpecies);
@@ -304,6 +381,7 @@
       if (typeof renderDupArchive === 'function') renderDupArchive();
       if (typeof renderPastMatrixTable === 'function') renderPastMatrixTable();
       if (typeof renderExamDocsIfOpen === 'function') renderExamDocsIfOpen();
+      if (typeof renderLawHistoryIfShown === 'function') renderLawHistoryIfShown();
       if (typeof renderSpeechDictList === 'function') renderSpeechDictList();
       if (typeof renderOrphanedStudyLog === 'function') renderOrphanedStudyLog();
       if (typeof renderPrecedentPage === 'function') renderPrecedentPage();
@@ -315,11 +393,14 @@
   }
 
   // クラウド側のデータをそのまま採用する（この端末に未同期の変更が無いときのみ安全）
+  // 自動で合わせる項目（開いた条文）だけは、丸ごと採用するときも、この端末の分を
+  // 足し合わせて残す（クラウドを選んでも、この端末で開いた条文の記録は消えない）
   function adoptRemoteWholesale(remoteData, remoteRevision) {
+    const before = snapshot();
     revision = remoteRevision;
     localStorage.setItem(REVISION_KEY, String(revision));
     applyRemoteData(remoteData);
-    markSynced(snapshot());
+    settleWithAutoMerged(before, remoteData, remoteRevision);
   }
 
   // --- 競合確認ポップアップ ---
@@ -379,7 +460,9 @@
 
     // 論証・学習記録以外の項目（カウントダウン・重複チェックのアーカイブなど）も、
     // 「違いが無い」と誤解させないよう、変わっている項目名だけ拾っておく
+    // 自動で合わせる項目（AUTO_MERGED_FIELDS）は、違っていても確認の対象にしない
     const otherFieldLabels = Object.keys(OTHER_FIELD_LABELS).filter(k => {
+      if (AUTO_MERGED_FIELDS[k]) return false;
       return canonicalJSON((localData || {})[k]) !== canonicalJSON((remoteData || {})[k]);
     }).map(k => OTHER_FIELD_LABELS[k]);
 
@@ -604,11 +687,12 @@
     try {
       // 選択の間に更に更新されている可能性があるため、最新のrevisionを取り直してから上書きする
       const remote = await syncFetchGet();
-      const data = snapshot();
+      const data = withAutoMerged(snapshot(), remote.data);
       const result = await syncFetchPost({ revision: remote.revision || 0, data });
       if (result.ok) {
         revision = result.result.revision;
         localStorage.setItem(REVISION_KEY, String(revision));
+        writeAutoMergedLocal(data);
         markSynced(data);
         hideSyncConflictModal();
         state('📱 この端末のデータを優先しました（' + new Date().toLocaleTimeString() + '）');
@@ -671,6 +755,8 @@
     const otherBase = otherFieldsSide === 'cloud' ? (remoteData || {}) : localData;
     const merged = Object.assign({}, localData, { entries: finalEntries, studyLog: finalStudyLog });
     Object.keys(OTHER_FIELD_LABELS).forEach(k => { merged[k] = otherBase[k]; });
+    // 開いた条文などの自動で合わせる項目は、どちらを選んでも両方を足し合わせる
+    Object.keys(AUTO_MERGED_FIELDS).forEach(k => { merged[k] = AUTO_MERGED_FIELDS[k](localData[k], (remoteData || {})[k]); });
     return merged;
   }
   // 編集競合でマージした論証タイトルを記録する。バナー→重複チェックで
@@ -689,6 +775,7 @@
     try {
       // 選択の間に更に更新されている可能性があるため、最新のrevisionを取り直してから保存する
       const remote = await syncFetchGet();
+      mergedData = withAutoMerged(mergedData, remote.data);
       const result = await syncFetchPost({ revision: remote.revision || 0, data: mergedData });
       if (result.ok) {
         revision = result.result.revision;
@@ -731,11 +818,11 @@
   async function autoResolveConflictFavoringActiveStudy(remoteData, remoteRevision, remoteUpdatedAt, retryCount) {
     const localData = snapshot();
     const diff = computeSyncDiff(localData, remoteData);
-    const merged = buildManualMergeSnapshot(diff, localData, remoteData, new Map(), 'local');
+    let merged = buildManualMergeSnapshot(diff, localData, remoteData, new Map(), 'local');
     try {
       // 選択の間に更に更新されている可能性があるため、最新のrevisionを取り直してから保存する
       const remote = await syncFetchGet();
-      const result = await syncFetchPost({ revision: remote.revision || 0, data: merged });
+      const result = await syncFetchPost({ revision: remote.revision || 0, data: merged = withAutoMerged(merged, remote.data) });
       if (result.ok) {
         revision = result.result.revision;
         localStorage.setItem(REVISION_KEY, String(revision));
@@ -999,9 +1086,8 @@
         // ポップアップを出すときは必ず何かしらの差分がある状態にする
         const diff = computeSyncDiff(data, result.latest.data);
         if (diff.isReallyIdentical) {
-          revision = result.latest.revision || revision;
-          localStorage.setItem(REVISION_KEY, String(revision));
-          markSynced(data);
+          // 開いた条文などの自動で合わせる項目だけが違うときも、ここで足し合わせる
+          settleWithAutoMerged(data, result.latest.data, result.latest.revision || revision);
           state('同期しました（' + new Date().toLocaleTimeString() + '）');
           return;
         }
@@ -1069,9 +1155,8 @@
     const localDataForDiff = snapshot();
     const diff = computeSyncDiff(localDataForDiff, remote.data);
     if (diff.isReallyIdentical) {
-      revision = remoteRevision;
-      localStorage.setItem(REVISION_KEY, String(revision));
-      markSynced(localDataForDiff);
+      // 開いた条文などの自動で合わせる項目だけが違うときも、ここで足し合わせる
+      settleWithAutoMerged(localDataForDiff, remote.data, remoteRevision);
       state('同期済み（' + new Date().toLocaleTimeString() + '）');
       return;
     }
@@ -1153,7 +1238,7 @@
   // 同期ロジックの自動テスト(tools/sync-test)から直接検証するための公開。アプリの動作には影響しない
   window.__ronshoSyncTest = {
     pushToCloud, pullFromCloud, snapshot, applyRemoteData, adoptRemoteWholesale,
-    hasUnsyncedLocalChanges, computeSyncDiff, canonicalJSON,
+    hasUnsyncedLocalChanges, computeSyncDiff, canonicalJSON, mergeLawHistory,
     showSyncConflictModal, hideSyncConflictModal, buildManualMergeSnapshot,
     isActivelyStudying, autoResolveConflictFavoringActiveStudy,
     getRevision: () => revision,

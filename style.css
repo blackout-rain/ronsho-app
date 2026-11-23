@@ -2001,6 +2001,13 @@ html { scrollbar-gutter: stable; }
 .lawStockTitle { font-weight: 700; font-size: 14px; }
 .lawStockCaption { font-size: 12px; color: var(--text-secondary); }
 .lawStockSnippet { font-size: 12px; color: #334155; margin: 4px 0; }
+/* 開いた条文の回数・お気に入り（v34.1〜） */
+.lawStockTitleRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lawStockFavBtn { background: none; border: none; font-size: 20px; line-height: 1; padding: 4px 6px; cursor: pointer; color: var(--text-secondary); min-width: 36px; min-height: 36px; }
+.lawStockFavBtn.active { color: inherit; }
+.lawStockMeta { font-size: 12px; color: var(--text-secondary); margin: 2px 0; }
+.lawStockNoText { font-style: italic; }
+.lawStockFavOnlyBtn.active { box-shadow: inset 0 0 0 2px #e0b400; font-weight: 700; }
 .bookLinkedRow { font-size: 12px; color: #4a6a90; margin-bottom: 6px; }
 .bookEntryPickerWrap { width: 100%; }
 .bookEntryPickerLabel { font-size: 13px; font-weight: 700; }

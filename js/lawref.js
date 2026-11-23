@@ -5,7 +5,9 @@
    ・条文本文はe-Gov（CORS開放済み）から取得し、端末内のキャッシュ
      'ronshoLawCacheV1' に保持する（キャッシュは端末固有のため同期対象外）
    ・表示方法（ポップアップ／その場に展開）は 'ronshoLawRefViewV1' で保持し、
-     同期・バックアップの対象に含める（drive-sync.js・js/backup.jsに登録） */
+     同期・バックアップの対象に含める（drive-sync.js・js/backup.jsに登録）
+   ・「📜 開いた条文」の一覧（開いた回数・☆）は 'ronshoLawHistoryV1' で保持し、
+     同期・バックアップの対象に含める（v34.1〜。条文の文は持たず、番号と回数だけ） */
 const LAWREF_LAWS = {
   constitution: { name: '憲法', lawId: '321CONSTITUTION', aliases: ['憲法'] },
   minpou: { name: '民法', lawNum: '明治二十九年法律第八十九号', aliases: ['民法'] },
@@ -658,6 +660,7 @@ function openLawRefPopup(ref) {
     if (!body) return;
     body.innerHTML = lawrefArticleBodyHtml(data, para);
     lawrefScrollToHit(body);
+    lawHistoryNoteOpened(lid, num, branch);
     if (foot) foot.innerHTML = escapeHtml(lawrefSourceNote(data)) + lawrefReadMoreButtonHtml(data, lid);
     lawrefAppendExamMentions(body, lid, num, branch);
   }).catch(err => {
@@ -709,6 +712,7 @@ function toggleLawRefInline(ref) {
   lawrefGetArticle(lid, num, branch).then(data => {
     if (!box.isConnected) return;
     box.querySelector('.lawRefInlineBody').innerHTML = lawrefArticleBodyHtml(data, para);
+    lawHistoryNoteOpened(lid, num, branch);
     box.querySelector('.lawRefInlineFoot').innerHTML = escapeHtml(lawrefSourceNote(data)) + lawrefReadMoreButtonHtml(data, lid);
     lawrefAppendExamMentions(box.querySelector('.lawRefInlineBody'), lid, num, branch);
   }).catch(err => {
@@ -719,7 +723,141 @@ function toggleLawRefInline(ref) {
       + lawrefOfflineHint(lid) + '</div>';
   });
 }
-// --- 条文ストック（一覧タブ）：取得済みキャッシュを辞書として眺める ---
+// --- 開いた条文の記録（v34.1〜）：番号・開いた回数・☆を、ほかの端末と同期する ---
+// 形：{ "minpou|709": { c: { 端末ID: { n: 開いた回数, at: 最後に開いた時刻 } },
+//                      del: 一覧から消した時刻, fav: ☆, favAt: ☆を変えた時刻 } }
+// 端末ごとに数えるのは、2台で同期の前に開いても回数を正しく足せるようにするため
+// （同期での足し合わせは drive-sync.js の mergeLawHistory）。消した条文は印（del）だけ
+// 残し、消した時刻より前に開いた回数は数えない（ほかの端末から戻ってこないように）。
+const LAW_HISTORY_KEY = 'ronshoLawHistoryV1';
+// 端末ID：回数を端末ごとに数えるための、この端末だけの名札（同期しない）
+const LAW_HISTORY_DEVICE_KEY = 'ronshoLawHistoryDeviceV1';
+// 以前（v34.0まで）の「開いた条文」＝この端末のキャッシュを、記録に移したかの印（同期しない）
+const LAW_HISTORY_MIGRATED_KEY = 'ronshoLawHistoryMigratedV1';
+function lawHistoryLoad() {
+  try {
+    const obj = JSON.parse(localStorage.getItem(LAW_HISTORY_KEY) || '{}');
+    return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+  } catch (e) {
+    return {};
+  }
+}
+function lawHistorySave(hist) {
+  try {
+    localStorage.setItem(LAW_HISTORY_KEY, JSON.stringify(hist || {}));
+  } catch (e) {
+    console.error('開いた条文の記録の保存に失敗しました:', e);
+  }
+  if (typeof window !== 'undefined' && typeof window.ronshoSyncNotifyChange === 'function') window.ronshoSyncNotifyChange();
+}
+function lawHistoryDeviceId() {
+  let id = null;
+  try { id = localStorage.getItem(LAW_HISTORY_DEVICE_KEY); } catch (e) {}
+  if (!id || !/^[a-z0-9]{6,32}$/.test(id)) {
+    id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    try { localStorage.setItem(LAW_HISTORY_DEVICE_KEY, id); } catch (e) {}
+  }
+  return id;
+}
+// 消した時刻より後に開いた分だけを、全端末ぶん足す
+function lawHistoryLiveCounts(item) {
+  const del = Number(item && item.del) || 0;
+  const c = (item && item.c && typeof item.c === 'object') ? item.c : {};
+  return Object.keys(c).map(dev => c[dev]).filter(r => r && (Number(r.at) || 0) > del);
+}
+function lawHistoryCount(item) {
+  return lawHistoryLiveCounts(item).reduce((sum, r) => sum + (Number(r.n) || 0), 0);
+}
+function lawHistoryLastAt(item) {
+  return lawHistoryLiveCounts(item).reduce((m, r) => Math.max(m, Number(r.at) || 0), 0);
+}
+// 一覧に出すのは、消した後に開いたもの、または☆のもの
+function lawHistoryIsListed(item) {
+  return !!(item && (item.fav || lawHistoryCount(item) > 0));
+}
+function lawHistoryRecordOpen(lid, num, branch, now) {
+  const t = now || Date.now();
+  const key = lawrefCacheKey(lid, num, branch);
+  const hist = lawHistoryLoad();
+  const item = (hist[key] && typeof hist[key] === 'object') ? hist[key] : {};
+  const dev = lawHistoryDeviceId();
+  const c = (item.c && typeof item.c === 'object') ? item.c : {};
+  const mine = c[dev];
+  const del = Number(item.del) || 0;
+  // 消した後に開くのは1回目から数え直す。時計が戻っていても、記録の時刻は前より進める
+  const alive = mine && (Number(mine.at) || 0) > del;
+  const at = Math.max(t, (mine && Number(mine.at) || 0) + 1, del + 1);
+  c[dev] = { n: alive ? (Number(mine.n) || 0) + 1 : 1, at: at };
+  item.c = c;
+  hist[key] = item;
+  lawHistorySave(hist);
+  return item;
+}
+// 条文リンク（ポップアップ・その場に展開）で条文が出たら、開いた回数を1つ増やす
+function lawHistoryNoteOpened(lid, num, branch) {
+  try {
+    lawHistoryRecordOpen(lid, num, branch);
+    if (typeof renderLawHistoryIfShown === 'function') renderLawHistoryIfShown();
+  } catch (e) {
+    console.error('開いた条文の記録に失敗しました:', e);
+  }
+}
+function lawHistoryToggleFav(key, now) {
+  const hist = lawHistoryLoad();
+  const item = (hist[key] && typeof hist[key] === 'object') ? hist[key] : {};
+  const t = Math.max(now || Date.now(), (Number(item.favAt) || 0) + 1);
+  if (item.fav) delete item.fav;
+  else item.fav = true;
+  item.favAt = t;
+  hist[key] = item;
+  lawHistorySave(hist);
+  return !!item.fav;
+}
+// 一覧から消す（☆も外す）。印だけ残して、ほかの端末からも消えるようにする
+function lawHistoryRemove(hist, key, t) {
+  const item = (hist[key] && typeof hist[key] === 'object') ? hist[key] : {};
+  item.del = Math.max(t, lawHistoryLastAt(item) + 1, (Number(item.del) || 0) + 1);
+  if (item.fav) { delete item.fav; item.favAt = Math.max(t, (Number(item.favAt) || 0) + 1); }
+  hist[key] = item;
+}
+function lawHistoryDelete(key, now) {
+  const hist = lawHistoryLoad();
+  lawHistoryRemove(hist, key, now || Date.now());
+  lawHistorySave(hist);
+}
+// 「すべて削除」：☆の条文は残す。消した条文の番号を返す（キャッシュも消すため）
+function lawHistoryClearUnfav(now) {
+  const t = now || Date.now();
+  const hist = lawHistoryLoad();
+  const removed = Object.keys(hist).filter(k => lawHistoryIsListed(hist[k]) && !hist[k].fav);
+  removed.forEach(k => lawHistoryRemove(hist, k, t));
+  if (removed.length) lawHistorySave(hist);
+  return removed;
+}
+// v34.0までの「開いた条文」は、この端末のキャッシュをそのまま一覧にしていた。
+// 初めて開いたときに1回だけ、キャッシュにある条文を「1回開いた」として記録に移す
+function lawHistoryMigrateFromCache() {
+  try { if (localStorage.getItem(LAW_HISTORY_MIGRATED_KEY) === '1') return false; } catch (e) { return false; }
+  const cache = lawrefLoadCache();
+  const hist = lawHistoryLoad();
+  const dev = lawHistoryDeviceId();
+  let changed = false;
+  Object.keys(cache).forEach(key => {
+    const item = (hist[key] && typeof hist[key] === 'object') ? hist[key] : {};
+    const c = (item.c && typeof item.c === 'object') ? item.c : {};
+    const at = Number(cache[key] && cache[key].at) || 1;
+    // すでにこの端末の記録がある・その後に一覧から消されている条文は、移さない
+    if (c[dev] || at <= (Number(item.del) || 0)) return;
+    c[dev] = { n: 1, at: at };
+    item.c = c;
+    hist[key] = item;
+    changed = true;
+  });
+  if (changed) lawHistorySave(hist);
+  try { localStorage.setItem(LAW_HISTORY_MIGRATED_KEY, '1'); } catch (e) {}
+  return changed;
+}
+// --- 条文ストック（一覧タブ）：開いた条文の記録を、この端末の控え（文）とあわせて眺める ---
 // 条文ストックの科目分け：法律→科目の対応と、科目タブ・一覧の並び順
 const LAWREF_LAW_SUBJECT = {
   constitution: '憲法', minpou: '民法', keiho: '刑法', shouhou: '商法', kaishahou: '商法',
@@ -744,9 +882,12 @@ function lawrefStockCompare(a, b) {
   if (na !== nb) return na - nb;
   return (Number(a.branch) || 0) - (Number(b.branch) || 0);
 }
+// 一覧の中身は開いた条文の記録（同期される）。条文の文（見出し・最初の項）は、
+// この端末の控え（キャッシュ）にあれば添える。無ければ「📖 表示」で取り直す
 function lawrefStockList() {
   const cache = lawrefLoadCache();
-  return Object.keys(cache).map(key => {
+  const hist = lawHistoryLoad();
+  return Object.keys(hist).filter(key => lawHistoryIsListed(hist[key])).map(key => {
     const sep = key.indexOf('|');
     const lid = sep === -1 ? key : key.slice(0, sep);
     const rest = sep === -1 ? '' : key.slice(sep + 1);
@@ -754,11 +895,20 @@ function lawrefStockList() {
     const num = dash === -1 ? rest : rest.slice(0, dash);
     const branch = dash === -1 ? null : rest.slice(dash + 1);
     const lawName = (LAWREF_LAWS[lid] && LAWREF_LAWS[lid].name) || lid;
-    return Object.assign({
+    return Object.assign({}, cache[key] || {}, {
       key: key, lid: lid, num: num, branch: branch, subject: lawrefSubjectOf(lid),
-      label: lawName + num + '条' + (branch ? 'の' + branch : '')
-    }, cache[key]);
+      label: lawName + num + '条' + (branch ? 'の' + branch : ''),
+      hasText: !!cache[key],
+      count: lawHistoryCount(hist[key]),
+      lastAt: lawHistoryLastAt(hist[key]),
+      fav: !!hist[key].fav
+    });
   }).sort(lawrefStockCompare);
+}
+let lawStockFavOnly = false;
+// 同期で記録が変わったとき（drive-sync.js）、「📜 開いた条文」を見ているときだけ描き直す
+function renderLawHistoryIfShown() {
+  if (lawStockMode === 'stock') renderLawStockPage();
 }
 function renderLawStockPage() {
   const area = document.getElementById('lawStockArea');
@@ -779,7 +929,16 @@ function renderLawStockPage() {
     if (typeof renderLawExamPane === 'function') renderLawExamPane();
     return;
   }
-  const all = lawrefStockList();
+  const everything = lawrefStockList();
+  const favCount = everything.filter(x => x.fav).length;
+  if (favCount === 0) lawStockFavOnly = false;
+  const favBtn = document.getElementById('lawStockFavOnlyBtn');
+  if (favBtn) {
+    favBtn.classList.toggle('active', lawStockFavOnly);
+    favBtn.textContent = (lawStockFavOnly ? '⭐ お気に入りだけ' : '☆ お気に入りだけ') + '（' + favCount + '）';
+    favBtn.disabled = favCount === 0 && !lawStockFavOnly;
+  }
+  const all = lawStockFavOnly ? everything.filter(x => x.fav) : everything;
   const tabsEl = document.getElementById('lawStockSubjectTabs');
   const subjects = LAWREF_SUBJECT_ORDER.filter(sub => all.some(x => x.subject === sub));
   if (lawStockSubjectFilter !== 'all' && !subjects.includes(lawStockSubjectFilter)) lawStockSubjectFilter = 'all';
@@ -794,16 +953,23 @@ function renderLawStockPage() {
   const countEl = document.getElementById('lawStockProgress');
   if (countEl) countEl.textContent = list.length > 0 ? list.length + '件' : '';
   if (all.length === 0) {
-    area.innerHTML = '<div class="quizEmpty">まだ取得した条文がありません。論証本文の条文リンクを押すとここに集まります。</div>';
+    area.innerHTML = '<div class="quizEmpty">まだ開いた条文がありません。論証本文の条文リンクを押すとここに集まります。</div>';
     return;
   }
   area.innerHTML = list.map(item => {
     const firstPara = (item.paras && item.paras[0] && item.paras[0].text) || '';
     const snippet = firstPara.length > 60 ? firstPara.slice(0, 60) + '…' : firstPara;
+    const meta = item.count > 0
+      ? '開いた回数 ' + item.count + '回' + (item.lastAt ? '・最後に開いた日 ' + lawHistoryFormatDate(item.lastAt) : '')
+      : '';
     return '<div class="lawStockCard" data-key="' + escapeHtml(item.key) + '">'
-      + '<div class="lawStockTitle">📜 ' + escapeHtml(item.label) + '</div>'
+      + '<div class="lawStockTitle lawStockTitleRow"><span>📜 ' + escapeHtml(item.label) + '</span>'
+      + '<button type="button" class="lawStockFavBtn' + (item.fav ? ' active' : '') + '" data-key="' + escapeHtml(item.key)
+      + '" aria-pressed="' + (item.fav ? 'true' : 'false') + '" title="' + (item.fav ? 'お気に入りから外す' : 'お気に入りにする') + '">' + (item.fav ? '⭐' : '☆') + '</button></div>'
+      + (meta ? '<div class="lawStockMeta">' + escapeHtml(meta) + '</div>' : '')
       + (item.caption ? '<div class="lawStockCaption">' + escapeHtml(item.caption) + '</div>' : '')
       + (snippet ? '<div class="lawStockSnippet">' + escapeHtml(snippet) + '</div>' : '')
+      + (!item.hasText ? '<div class="lawStockSnippet lawStockNoText">この端末にはまだ文がありません（📖 表示で開きます）</div>' : '')
       + '<div class="bookActionsRow">'
       + '<button type="button" class="lawStockViewBtn" data-key="' + escapeHtml(item.key) + '">📖 表示</button>'
       + '<button type="button" class="lawStockDeleteBtn" data-key="' + escapeHtml(item.key) + '">🗑️ 削除</button>'
@@ -813,6 +979,10 @@ function renderLawStockPage() {
 }
 // --- 全条を読む（通読・条番号ジャンプ・条文内検索）とダウンロード管理 ---
 let lawStockMode = 'stock';
+function lawHistoryFormatDate(at) {
+  const d = new Date(at);
+  return (d.getMonth() + 1) + '/' + d.getDate();
+}
 const lawReadState = { lid: null, view: 'toc', range: null, hitIndex: null, query: '', jumpKey: null };
 const lawfullBusy = {};
 let lawfullBulkRunning = false;
@@ -1168,23 +1338,47 @@ function initLawStockFeature() {
       openLawRefPopup(span);
       return;
     }
+    const favBtn = e.target.closest('.lawStockFavBtn');
+    if (favBtn) {
+      const on = lawHistoryToggleFav(favBtn.dataset.key);
+      renderLawStockPage();
+      status.textContent = on ? '⭐ お気に入りにしました。' : '☆ お気に入りから外しました。';
+      return;
+    }
     const delBtn = e.target.closest('.lawStockDeleteBtn');
     if (delBtn) {
+      const key = delBtn.dataset.key;
+      const item = lawHistoryLoad()[key];
+      if (item && item.fav && !confirm('お気に入り（⭐）の条文です。一覧から削除しますか？')) return;
+      lawHistoryDelete(key);
       const cache = lawrefLoadCache();
-      if (!cache[delBtn.dataset.key]) return;
-      delete cache[delBtn.dataset.key];
-      lawrefSaveCache(cache);
+      if (cache[key]) { delete cache[key]; lawrefSaveCache(cache); }
       renderLawStockPage();
-      status.textContent = '🗑️ 条文ストックから削除しました。';
+      status.textContent = '🗑️ 開いた条文から削除しました（ほかの端末からも消えます）。';
     }
   });
-  if (clearBtn) clearBtn.addEventListener('click', () => {
-    if (Object.keys(lawrefLoadCache()).length === 0) return;
-    if (!confirm('取得済みの条文ストックをすべて削除しますか？（条文リンクから再取得できます）')) return;
-    lawrefSaveCache({});
+  const favOnlyBtn = document.getElementById('lawStockFavOnlyBtn');
+  if (favOnlyBtn) favOnlyBtn.addEventListener('click', () => {
+    lawStockFavOnly = !lawStockFavOnly;
     renderLawStockPage();
-    status.textContent = '🗑️ 条文ストックをすべて削除しました。';
   });
+  // すべて削除：☆の条文は残す（ほかの端末の一覧からも消える）
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    const list = lawrefStockList();
+    const targets = list.filter(x => !x.fav);
+    if (targets.length === 0) {
+      if (list.length) status.textContent = '⭐ お気に入りの条文だけなので、削除するものはありません。';
+      return;
+    }
+    if (!confirm('開いた条文（' + targets.length + '件）を一覧から削除しますか？\n・お気に入り（⭐）の条文は残します\n・ほかの端末の一覧からも消えます（条文リンクからまた開けます）')) return;
+    const removed = lawHistoryClearUnfav();
+    const cache = lawrefLoadCache();
+    removed.forEach(k => { delete cache[k]; });
+    lawrefSaveCache(cache);
+    renderLawStockPage();
+    status.textContent = '🗑️ 開いた条文を削除しました（お気に入りは残しています）。';
+  });
+  lawHistoryMigrateFromCache();
   renderLawStockPage();
 }
 initLawStockFeature();

@@ -250,6 +250,8 @@ function restoreFromBackupPayload(data) {
   if (data.examRead && typeof data.examRead === 'object' && !Array.isArray(data.examRead)) localStorage.setItem('ronshoExamReadV1', JSON.stringify(data.examRead));
   // 百選の目次（v33.0〜）。古いバックアップには無いので、そのときは今の目次を残す
   if (Array.isArray(data.hyakusenToc)) localStorage.setItem('ronshoHyakusenTocV1', JSON.stringify(data.hyakusenToc));
+  // 開いた条文の回数・お気に入り（v34.1〜）。古いバックアップには無いので、そのときは今の記録を残す
+  if (data.lawHistory && typeof data.lawHistory === 'object' && !Array.isArray(data.lawHistory)) localStorage.setItem('ronshoLawHistoryV1', JSON.stringify(data.lawHistory));
   // 過去問の資料のマーカー（v34.0〜）。古いバックアップには無いので、そのときは今のマーカーを残す
   if (data.examMarks && typeof data.examMarks === 'object' && !Array.isArray(data.examMarks)) localStorage.setItem('ronshoExamMarksV1', JSON.stringify(data.examMarks));
   if (entries.length > 0) {
