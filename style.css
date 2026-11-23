@@ -36,6 +36,10 @@ html {
   /* 過去問の資料（js/exam-docs.js）：採点実感の色分けと、問題・趣旨・実感の色 */
   --exam-good-bg: #c9f0d9;
   --exam-bad-bg: #ffd9d2;
+  /* 過去問の資料のマーカー（js/exam-marks.js、v34.0〜）：黄・青・ピンク */
+  --exam-mark-y: #fff06b;
+  --exam-mark-b: #b8e1ff;
+  --exam-mark-p: #ffc6df;
   --exam-q: #1d5fd1;
   --exam-s: #0f8a6a;
   --exam-k: #b4570f;
@@ -76,6 +80,9 @@ html {
     --btn-grad-2-hover: rgba(43,60,92,0.98);
     --exam-good-bg: #1d4a35;
     --exam-bad-bg: #5a2a22;
+    --exam-mark-y: #6b5d10;
+    --exam-mark-b: #1e4d7a;
+    --exam-mark-p: #6f2a4c;
     --exam-q: #7fb0ff;
     --exam-s: #4fd1aa;
     --exam-k: #f0a160;
@@ -114,6 +121,9 @@ html {
   --btn-grad-2-hover: rgba(43,60,92,0.98);
   --exam-good-bg: #1d4a35;
   --exam-bad-bg: #5a2a22;
+  --exam-mark-y: #6b5d10;
+  --exam-mark-b: #1e4d7a;
+  --exam-mark-p: #6f2a4c;
   --exam-q: #7fb0ff;
   --exam-s: #4fd1aa;
   --exam-k: #f0a160;
@@ -2187,7 +2197,59 @@ html { scrollbar-gutter: stable; }
   .examDocKindTab { font-size: 13px; padding: 6px 9px; }
   .examDocBody { font-size: 15.5px; }
   .examDocTimer { font-size: 19px; }
+  .examMarkBar { gap: 4px; padding: 6px 8px; }
+  .examMarkBarBtn { padding: 7px 11px; }
+  .examMarkBarText { display: none; }
 }
+/* 段落の頭を1字下げる（v34.0）：ふつうの文で始まる段落だけ（番号・記号・括弧で始まる段落は下げない） */
+.examDocBody p.examDocIndent { text-indent: 1em; }
+/* マーカー（js/exam-marks.js、v34.0〜） */
+mark.examMark { color: inherit; border-radius: 2px; padding: 0; cursor: pointer; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.examMark-y { background: var(--exam-mark-y); }
+.examMark-b { background: var(--exam-mark-b); }
+.examMark-p { background: var(--exam-mark-p); }
+mark.examMark.examMarkFocus { outline: 2px solid #0057e7; outline-offset: 1px; }
+.examMarkTapOn .examDocBody p { cursor: pointer; }
+.examMarkTools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12.5px; margin: -2px 0 10px; padding: 6px 8px; border-radius: 8px; background: var(--tint-6); }
+.examMarkToolsLabel { font-weight: 800; }
+.examMarkColors { display: inline-flex; gap: 4px; }
+.examMarkColorBtn, .examMarkBarBtn {
+  font-size: 12.5px; font-weight: 700; padding: 4px 11px; border-radius: 999px; cursor: pointer; box-shadow: none;
+  border: 2px solid transparent; color: var(--text);
+}
+.examMarkColorBtn.active, .examMarkBarBtn.active { border-color: var(--text); }
+.examMarkTapToggle { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; }
+.examMarkHint { color: var(--text-secondary); font-size: 11.5px; }
+/* なぞって選んだとき・マーカーを押したときに、画面の下に出る色のボタン */
+.examMarkBar {
+  display: none; position: fixed; left: 0; right: 0; margin: 0 auto; width: max-content; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 1050;
+  align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 24px); box-sizing: border-box;
+  background: var(--card-bg); color: var(--text); border: 1px solid var(--border-strong); border-radius: 14px;
+  padding: 8px 10px; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.22); -webkit-user-select: none; user-select: none;
+}
+.examMarkBar.show { display: flex; }
+.examMarkBarLabel { font-size: 12.5px; font-weight: 800; }
+.examMarkBarBtn { font-size: 14px; padding: 7px 14px; }
+.examMarkBarErase { background: var(--card-bg); border-color: var(--border-strong); }
+.examMarkBarClose { border: none; background: transparent; color: var(--text-secondary); font-size: 16px; cursor: pointer; box-shadow: none; padding: 4px 6px; }
+/* 引いたところの一覧 */
+.examMarkList { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+.examMarkListHead { border: none; background: transparent; color: var(--text); font-weight: 800; font-size: 14px; padding: 2px 0; cursor: pointer; box-shadow: none; }
+.examMarkListNote { font-size: 12px; color: var(--text-secondary); margin: 4px 0 6px; }
+.examMarkListKind { font-weight: 800; font-size: 13px; margin: 10px 0 4px; }
+.examMarkListKind[data-kind="mondai"] { color: var(--exam-q); }
+.examMarkListKind[data-kind="shushi"] { color: var(--exam-s); }
+.examMarkListKind[data-kind="jikkan"] { color: var(--exam-k); }
+.examMarkItem { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
+.examMarkItemGo {
+  flex: 1 1 auto; min-width: 0; text-align: left; font-size: 13.5px; line-height: 1.7; padding: 4px 6px; border-radius: 6px;
+  border: 1px solid transparent; background: transparent; color: var(--text); cursor: pointer; box-shadow: none;
+}
+.examMarkItemGo:hover { border-color: var(--border); }
+.examMarkItemGo[disabled] { cursor: default; opacity: 0.7; }
+.examMarkLost { display: block; font-size: 11px; color: var(--text-secondary); }
+.examMarkItemDel { flex: 0 0 auto; font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--card-bg); color: var(--text-secondary); cursor: pointer; box-shadow: none; }
+.examMarkItemDel.armed { background: #b42318; border-color: #b42318; color: #fff; }
 /* ▲▲▲ 過去問の資料 ここまで ▲▲▲ */
 
 /* 出題趣旨で指摘された条文・判例のつながり（js/exam-refs.js、v33.0〜） */

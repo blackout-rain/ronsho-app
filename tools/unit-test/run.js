@@ -346,7 +346,7 @@ console.log('\n■ localStorageキーの同期登録漏れ');
     ronshoXpPastExamMigratedV1: 'XPの移行処理済みフラグ（端末ごとの内部管理）',
     ronshoExamDocsDB: '過去問の資料（問題・出題趣旨・採点実感）の控えの保存先（IndexedDBの名前。約4MBあり、各端末で取り直せる）',
     ronshoExamPracticeV1: '「時間を計って解く」の解答中の状態（その端末で解いている最中だけのもの）',
-    ronshoExamDocsViewV1: '過去問の資料の並べ方・色分けの表示の好み（3列表示は画面の広さで選ぶもの）'
+    ronshoExamDocsViewV1: '過去問の資料の並べ方・色分け・マーカーの色と「文をタップで引く」の表示の好み（3列表示は画面の広さで選ぶもの。引いたマーカーそのものは ronshoExamMarksV1 で同期する）'
   };
   const syncCode = read('drive-sync.js');
   const backupCode = read(path.join('js', 'backup.js'));
@@ -717,7 +717,8 @@ console.log('\n■ 過去問の資料：表示・色分け・読んだ印・論�
   eq('解答中でなければ何もしない', ex('examDocsFinishPractice()'), '');
   ex('localStorage.setItem("ronshoExamPracticeV1", "{壊れた")');
   eq('壊れた解答中の値は無視する', ex('loadExamPractice()'), null);
-  eq('表示の好みの既定値（解く時間は40分）', ex('loadExamDocsView()'), { layout: 'tabs', hl: true, filter: 'all', minutes: 40 });
+  // v34.0 でマーカーの色（黄）と「文をタップで引く」（オフ）を表示の好みに足した
+  eq('表示の好みの既定値（解く時間は40分・マーカーは黄・文タップはオフ）', ex('loadExamDocsView()'), { layout: 'tabs', hl: true, filter: 'all', minutes: 40, mkColor: 'y', mkTap: false });
   // 解く時間：40分・45分・その他（入力する）（v32.2）
   eq('解く時間の選択肢は40分と45分', ex('EXAM_DOCS_MINUTE_PRESETS'), [40, 45]);
   eq('まだ選んでいなければ40分', ex('examDocsPracticeMinutes()'), 40);
@@ -800,6 +801,82 @@ console.log('\n■ iPad：マスの長押し・過去問ログのはみ出し（
   check('ログ欄は幅が足りなくても画面の外に出さず、その中で横にスクロールする', /\.pastLogCol \{[^}]*overflow-x: auto/.test(css));
 }
 
+console.log('\n■ 過去問の資料：段落の頭の字下げ・マーカー（v34.0）');
+{
+  const mk = loadApp(['js/core.js', 'js/past-exam.js', 'js/lawref.js', 'js/exam-docs.js', 'js/exam-refs.js', 'js/exam-marks.js']);
+  const ind = mk('examDocsParaIndent');
+  eq('ふつうの文で始まる段落は1字下げる', [ind('本問は，表現の自由を問うものである。'), ind('「優秀」に該当する答案は，出題趣旨を理解していた。'), ind('Ａは，Ｂに対し，代金の支払を求めた。'), ind('一応の水準の答案は少なかった。'), ind('フェイク・ニュース規制法（案）')], [true, true, true, true, true]);
+  eq('番号・記号・括弧・話し手で始まる段落は下げない', [
+    ind('（１）　設問１について'), ind('(ｱ)　原告適格'), ind('ア　設問１の全体的な採点実感'), ind('イ　答案の例'), ind('１　出題の趣旨と採点の方針について述べる。'), ind('1.　総論'),
+    ind('⑴　違法性の承継について'), ind('②について検討する。'), ind('・　本件事業認定の違法を主張できるか。'), ind('○　総論'), ind('〇　農地法（抜粋）'), ind('※　配点は別紙'),
+    ind('一　虚偽表現　虚偽の事実をいう。'), ind('二～六　（略）'), ind('ロ～ホ　（略）'), ind('第１　設問１'), ind('【事例】'), ind('〔設問１〕について'),
+    ind('弁護士Ｄ：Ａさんは，違法であると考えている。'), ind('甲：規制①が検討された背景には'), ind('Ｘ：そうです。'), ind('　すでに空白で始まる段落'), ind('')
+  ], new Array(23).fill(false));
+  check('見出しは下げない', !ind('〔第１問〕（配点：１００）'));
+  const ph = mk('examDocsParaHtml');
+  check('下げる段落に examDocIndent を付ける', /^<p class="examDocIndent" data-pi="3">/.test(ph('本問は易しい。', false, 3)));
+  check('番号で始まる段落には付けない', /^<p data-pi="0">/.test(ph('１　総論について述べる。', false, 0)));
+  const css = read('style.css');
+  check('字下げは1字（text-indent: 1em）', /\.examDocBody p\.examDocIndent \{ text-indent: 1em; \}/.test(css));
+
+  // マーカーの範囲の計算
+  const paras = ['本問は易しい。答案は不十分であった。　', '二つ目の段落です。', '三つ目。'];
+  const apply = (list, p, s, e, c) => JSON.parse(JSON.stringify(mk('examMarksApply')(paras, list, p, s, e, c)));
+  let L = apply([], 0, 0, 7, 'y');
+  eq('引くと、段落・位置・色・文を持つ', L, [{ p: 0, s: 0, e: 7, c: 'y', t: '本問は易しい。' }]);
+  eq('前後の空白は含めない', apply([], 0, 7, 19, 'b'), [{ p: 0, s: 7, e: 18, c: 'b', t: '答案は不十分であった。' }]);
+  eq('同じ色で重なる・隣り合うものは1つにまとめる', apply(apply(L, 0, 5, 10, 'y'), 0, 10, 12, 'y'), [{ p: 0, s: 0, e: 12, c: 'y', t: '本問は易しい。答案は不十' }]);
+  eq('違う色を重ねると、重なったところだけ新しい色にする', apply(L, 0, 2, 4, 'p'), [{ p: 0, s: 0, e: 2, c: 'y', t: '本問' }, { p: 0, s: 2, e: 4, c: 'p', t: 'は易' }, { p: 0, s: 4, e: 7, c: 'y', t: 'しい。' }]);
+  eq('消すと、その範囲だけ消える（両側は残る）', apply(L, 0, 2, 4, null), [{ p: 0, s: 0, e: 2, c: 'y', t: '本問' }, { p: 0, s: 4, e: 7, c: 'y', t: 'しい。' }]);
+  eq('全部消すと空になる', apply(L, 0, 0, 7, null), []);
+  eq('ほかの段落のマーカーには触れない', apply(apply(L, 1, 0, 3, 'b'), 1, 0, 9, null), L);
+  check('元の配列は変えない', JSON.stringify(L) === JSON.stringify([{ p: 0, s: 0, e: 7, c: 'y', t: '本問は易しい。' }]));
+  // 資料を作り直して文がずれたとき
+  const res = mk('examMarksResolve');
+  const moved = JSON.parse(JSON.stringify(res(['はじめに。本問は易しい。', 'x'], [{ p: 0, s: 0, e: 7, c: 'y', t: '本問は易しい。' }])));
+  eq('位置がずれても、同じ段落で文を探し直す', moved, [{ i: 0, c: 'y', t: '本問は易しい。', p: 0, s: 5, e: 12 }]);
+  eq('段落の番号がずれても、ほかの段落から探す', JSON.parse(JSON.stringify(res(['前書き', '本問は易しい。'], [{ p: 0, s: 0, e: 7, c: 'y', t: '本問は易しい。' }])))[0].p, 1);
+  eq('見つからない・壊れた値は p: null（描かない）', JSON.parse(JSON.stringify(res(paras, [{ p: 0, s: 0, e: 3, c: 'y', t: '無い文' }, { p: 0, s: 3, e: 1, c: 'y', t: '' }, { p: 0, s: 0, e: 2, c: 'z', t: '本問' }]))).map(r => r.p), [null, null, null]);
+  eq('見失ったマーカーは、ほかを引いても消さずに残す', apply([{ p: 0, s: 0, e: 3, c: 'y', t: '無い文' }], 2, 0, 4, 'b'), [{ p: 0, s: 0, e: 3, c: 'y', t: '無い文' }, { p: 2, s: 0, e: 4, c: 'b', t: '三つ目。' }]);
+  // 文をタップ
+  const at = mk('examMarksSentenceAt');
+  eq('タップした字を含む文（。まで）', [at(paras[0], 0), at(paras[0], 6), at(paras[0], 7), at(paras[0], 17)].map(r => r && [r.s, r.e]), [[0, 7], [0, 7], [7, 18], [7, 18]]);
+  const tog = (list, p, off, c) => JSON.parse(JSON.stringify(mk('examMarksToggleSentence')(paras, list, p, off, c)));
+  const t1 = tog([], 0, 9, 'p');
+  eq('文をタップすると、その文全体に引く', t1.list, [{ p: 0, s: 7, e: 18, c: 'p', t: '答案は不十分であった。' }]);
+  eq('同じ色の文をもう一度タップすると消す', tog(t1.list, 0, 12, 'p').list, []);
+  eq('違う色の文をタップすると、今の色に塗り替える', tog(t1.list, 0, 12, 'b').list, [{ p: 0, s: 7, e: 18, c: 'b', t: '答案は不十分であった。' }]);
+  eq('文の一部だけ引いてあれば、文全体に広げる', tog(apply([], 0, 1, 3, 'y'), 0, 0, 'y').list, [{ p: 0, s: 0, e: 7, c: 'y', t: '本問は易しい。' }]);
+  // 描く
+  const by = mk('examMarksByPara')(res(paras, apply(apply([], 0, 0, 7, 'y'), 0, 10, 12, 'b')));
+  const html = ph(paras[0], true, 0, by[0]);
+  check('マーカーを mark で描き、番号（data-mi）を付ける', /<mark class="examMark examMark-y" data-mi="0">本問は易しい。<\/mark>/.test(html) && /<mark class="examMark examMark-b" data-mi="1">不十<\/mark>/.test(html), html);
+  check('採点実感の色分けの中にマーカーを入れても、文はそのまま', /<span class="examHlBad">答案は<mark[^>]*>不十<\/mark>分であった。<\/span>　<\/p>/.test(html), html);
+  const esc = ph('<b>強調</b>です。', false, 0, [{ s: 0, e: 3, c: 'p', i: 0 }]);
+  check('マーカーの中の文もエスケープする', /<mark class="examMark examMark-p" data-mi="0">&lt;b&gt;<\/mark>強調&lt;\/b&gt;です。/.test(esc), esc);
+  eq('重なった値は描くときに切り詰める', JSON.parse(JSON.stringify(mk('examMarksByPara')([{ i: 0, p: 0, s: 0, e: 5, c: 'y' }, { i: 1, p: 0, s: 3, e: 8, c: 'b' }]))), { 0: [{ s: 0, e: 5, c: 'y', i: 0 }, { s: 5, e: 8, c: 'b', i: 1 }] });
+  // 保存と、資料ごとの取り出し
+  mk('saveExamMarks')({ '新司法試験|7|民法|shushi': [{ p: 0, s: 0, e: 7, c: 'y', t: '本問は易しい。' }] });
+  eq('保存して資料ごとに取り出せる', JSON.parse(JSON.stringify(mk('examMarksForDoc("新司法試験", 7, "民法", "shushi", ' + JSON.stringify(paras) + ')'))), { 0: [{ s: 0, e: 7, c: 'y', i: 0 }] });
+  eq('ほかの資料には出ない', mk('examMarksForDoc("新司法試験", 7, "民法", "jikkan", ' + JSON.stringify(paras) + ')'), null);
+  mk('localStorage.setItem("ronshoExamMarksV1", "[壊れた")');
+  eq('壊れた値でも空として読む', JSON.parse(JSON.stringify(mk('loadExamMarks()'))), {});
+  check('本文の文字の位置は、判例の印（百選○・⚖️）を数えない', /querySelectorAll\('\.examCaseBadge'\)/.test(read('js/exam-marks.js')));
+  // 同期・バックアップ
+  const sync = read('drive-sync.js'), bk = read('js/backup.js'), idx = read('index.html'), sw = read('sw.js');
+  check('マーカーは同期の対象（snapshot・applyRemoteData・競合の表示）', /examMarks: read\(EXAM_MARKS_KEY, \{\}\)/.test(sync) && /write\(EXAM_MARKS_KEY,/.test(sync) && /examMarks: '🖍/.test(sync));
+  check('マーカーは手動バックアップから戻せる', /data\.examMarks[\s\S]{0,120}ronshoExamMarksV1/.test(bk));
+  check('index.html で exam-marks.js を exam-docs.js の後に読み、オフライン用にも入れる', idx.indexOf('js/exam-marks.js') > idx.indexOf('js/exam-docs.js') && sw.includes("'./js/exam-marks.js'"));
+  // 一覧
+  mk('saveExamMarks')({ '新司法試験|7|民法|shushi': [{ p: 0, s: 0, e: 7, c: 'y', t: '本問は易しい。' }], '新司法試験|7|民法|mondai': [{ p: 1, s: 0, e: 3, c: 'b', t: '二つ目' }] });
+  mk('examDocsState.examType = "新司法試験"; examDocsState.year = 7; examDocsState.subject = "民法"; examDocsState.mkListOpen = true;');
+  const subj = { mondai: { paras: paras }, shushi: { paras: paras } };
+  const listHtml = mk('examMarksListHtml')(mk('examDocsState'), subj, false);
+  check('引いたところの一覧に件数と文を出す', /引いたところ（2件）/.test(listHtml) && /二つ目/.test(listHtml) && /本問は易しい。/.test(listHtml) && listHtml.indexOf('二つ目') < listHtml.indexOf('本問は易しい'), listHtml);
+  const lockedHtml = mk('examMarksListHtml')(mk('examDocsState'), subj, true);
+  check('解いている間は、出題趣旨・採点実感のマーカーの文を一覧に出さない', /二つ目/.test(lockedHtml) && !/本問は易しい/.test(lockedHtml) && /解き終えるまで隠しています/.test(lockedHtml), lockedHtml);
+}
+
 console.log('\n■ 出題趣旨の条文・判例：読み取り・索引・照合（v33.0）');
 {
   const rf = loadApp(['js/core.js', 'js/past-exam.js', 'js/precedent.js', 'js/lawref.js', 'js/exam-docs.js', 'js/exam-refs.js']);
@@ -856,7 +933,8 @@ console.log('\n■ 出題趣旨の条文・判例：読み取り・索引・照�
   check('資料：百選にある判例は下線＋「百選1」', /<span class="examCaseRef hit" data-act="caseRef" data-ck="最\|1975-04-30" data-rep="民集29-4-572"[^>]*>最大判昭和５０年４月３０日民集２９巻４号５７２頁<span class="examCaseBadge">百選1<\/span><\/span>/.test(linked), linked);
   check('資料：どこにも無い判例は下線だけ（印なし）', /<span class="examCaseRef" data-act="caseRef" data-ck="最\|1990-01-01"/.test(linked) && /data-pi="3"/.test(linked), linked);
   const body = rf('examDocsBodyHtml')(['最判平成２年１月１日', '〔設問１〕'], { hl: false, filter: 'all', cases: true });
-  check('資料：段落に番号（data-pi）を付ける', /<p data-pi="0">/.test(body) && /<p class="examDocH" data-pi="1">/.test(body), body);
+  // v34.0 から、ふつうの文で始まる段落には字下げの印（examDocIndent）が付く
+  check('資料：段落に番号（data-pi）を付ける', /<p class="examDocIndent" data-pi="0">/.test(body) && /<p class="examDocH" data-pi="1">/.test(body), body);
   check('資料：問題文には判例の下線を付けない（cases を渡さない）', !/examCaseRef/.test(rf('examDocsBodyHtml')(['最判平成２年１月１日'], { hl: false, filter: 'all' })));
   check('資料：絞り込んでも段落の番号は元のまま', /data-pi="2"/.test(rf('examDocsBodyHtml')(['〔設問〕', 'よく書けていた答案があった。', '検討が不十分な答案が多かった。'], { hl: true, filter: 'bad' })));
   // 指摘のボタン：年度・科目ごとにまとめ、新しい年度から

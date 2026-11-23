@@ -81,19 +81,39 @@ function examDocsParagraphClass(p) {
   const kinds = examDocsSplitSentences(p).map(examDocsClassifySentence);
   return { bad: kinds.includes('bad'), good: kinds.includes('good') };
 }
+// 段落の頭を1字下げるか（v34.0）。ふつうの文で始まる段落だけ下げ、
+// 「（１）」「ア　」「１　」「⑴」「・」「〔設問〕」「弁護士Ｄ：」のような、番号・記号・括弧・話し手で始まる段落は下げない。
+// 「「優秀」に該当する答案は…」のように「 で始まる文は、ふつうの文として下げる
+// 括弧（「 『 は除く）・数字・①⑴⒈Ⅰ・漢数字の番号（「一　」）・「第１」・1字の記号（「ア　」「Ａ　」）・記号・
+// 話し手（「弁護士Ｄ：」「甲：」）・すでに空白で始まるもの
+const EXAM_DOCS_NO_INDENT_RE = /^(?:[（(［\[〔【｛{〈《＜<]|[0-9０-９]|[①-⓿❶-➓Ⅰ-ⅿ]|[一二三四五六七八九十]+[\s　、，．.）)～〜]|第[0-9０-９一二三四五六七八九十]+|[ァ-ヶｦ-ﾝＡ-Ｚａ-ｚA-Za-z][\s　．.）)～〜]|[・○〇●◯◎■□◆◇▲△▼▽★☆※＊*→⇒－―—\-•▶➢]|[^\s　。、，．「」（）()]{1,8}[：:]|[\s　])/;
+function examDocsParaIndent(p) {
+  const s = String(p || '');
+  if (!s || examDocsIsHeading(s)) return false;
+  return !EXAM_DOCS_NO_INDENT_RE.test(s);
+}
 // 1つの段落をHTMLにする。hl が真なら文ごとに色を付ける
-// pi：段落の番号（出題趣旨で指摘された条文・判例の一覧から、その段落へ飛ぶため）
-function examDocsParaHtml(p, hl, pi) {
+// pi：段落の番号（出題趣旨で指摘された条文・判例の一覧から、その段落へ飛ぶため・マーカーの位置のため）
+// marks：この段落のマーカー（js/exam-marks.js の examMarksByPara の1段落分。重ならない・並べ済み）
+function examDocsParaHtml(p, hl, pi, marks) {
   const at = pi == null ? '' : ' data-pi="' + pi + '"';
-  if (examDocsIsHeading(p)) return '<p class="examDocH"' + at + '>' + escapeHtml(p) + '</p>';
-  if (!hl) return '<p' + at + '>' + escapeHtml(p) + '</p>';
-  const html = examDocsSplitSentences(p).map(s => {
+  const text = String(p == null ? '' : p);
+  const mk = Array.isArray(marks) && marks.length > 0 && typeof examMarksSliceHtml === 'function' ? marks : null;
+  const slice = (a, b) => mk ? examMarksSliceHtml(text, a, b, mk) : escapeHtml(text.slice(a, b));
+  if (examDocsIsHeading(text)) return '<p class="examDocH"' + at + '>' + slice(0, text.length) + '</p>';
+  const cls = examDocsParaIndent(text) ? ' class="examDocIndent"' : '';
+  if (!hl) return '<p' + cls + at + '>' + slice(0, text.length) + '</p>';
+  let pos = 0;
+  const html = examDocsSplitSentences(text).map(s => {
+    const a = pos;
+    pos += s.length;
     const c = examDocsClassifySentence(s);
-    if (c === 'bad') return '<span class="examHlBad">' + escapeHtml(s) + '</span>';
-    if (c === 'good') return '<span class="examHlGood">' + escapeHtml(s) + '</span>';
-    return escapeHtml(s);
+    const inner = slice(a, pos);
+    if (c === 'bad') return '<span class="examHlBad">' + inner + '</span>';
+    if (c === 'good') return '<span class="examHlGood">' + inner + '</span>';
+    return inner;
   }).join('');
-  return '<p' + at + '>' + html + '</p>';
+  return '<p' + cls + at + '>' + html + '</p>';
 }
 // filter: 'all' | 'bad' | 'good'。絞り込むときも見出しは残し、どの設問の話かが分かるようにする
 function examDocsBodyHtml(paras, opts) {
@@ -104,7 +124,7 @@ function examDocsBodyHtml(paras, opts) {
       const c = examDocsParagraphClass(p);
       if (filter === 'bad' ? !c.bad : !c.good) return '';
     }
-    return examDocsParaHtml(p, hl, pi);
+    return examDocsParaHtml(p, hl, pi, opts && opts.marks ? opts.marks[pi] : null);
   }).join('');
   // 判例の引用に下線（押すと百選・判例タブ・ほかの年度の指摘。js/exam-refs.js、v33.0〜）
   if (opts && opts.cases && typeof examRefsLinkifyCasesHtml === 'function') html = examRefsLinkifyCasesHtml(html);
@@ -262,13 +282,16 @@ function examDocsFormatRemaining(ms) {
 
 // --- 表示の好み（この端末だけ）：並べ方・色分け・絞り込み ---
 function loadExamDocsView() {
-  const d = { layout: 'tabs', hl: true, filter: 'all', minutes: EXAM_DOCS_MINUTE_PRESETS[0] };
+  // mkColor・mkTap：マーカーの色と「文をタップで引く」（v34.0、js/exam-marks.js）
+  const d = { layout: 'tabs', hl: true, filter: 'all', minutes: EXAM_DOCS_MINUTE_PRESETS[0], mkColor: 'y', mkTap: false };
   try {
     const v = JSON.parse(localStorage.getItem(EXAM_DOCS_VIEW_KEY) || '{}');
     if (v && (v.layout === 'tabs' || v.layout === 'side')) d.layout = v.layout;
     if (v && typeof v.hl === 'boolean') d.hl = v.hl;
     if (v && (v.filter === 'all' || v.filter === 'bad' || v.filter === 'good')) d.filter = v.filter;
     if (v && Number.isInteger(v.minutes) && v.minutes >= 1 && v.minutes <= EXAM_DOCS_MINUTES_MAX) d.minutes = v.minutes;
+    if (v && (v.mkColor === 'y' || v.mkColor === 'b' || v.mkColor === 'p')) d.mkColor = v.mkColor;
+    if (v && typeof v.mkTap === 'boolean') d.mkTap = v.mkTap;
   } catch (e) {}
   return d;
 }
@@ -414,6 +437,7 @@ function openExamDocs(opts) {
 }
 function closeExamDocs() {
   examDocsState.open = false;
+  if (typeof examMarksHideBar === 'function') examMarksHideBar();
   const els = examDocsEls();
   if (els.page) els.page.classList.remove('examDocsOpen');
   if (els.view) els.view.innerHTML = '';
@@ -495,6 +519,8 @@ function examDocsPanelHtml(st, data, kind, view, readMap, locked) {
       + '</div>';
   }
   const opts = kind.id === 'jikkan' ? { hl: view.hl, filter: view.filter, cases: true } : { hl: false, filter: 'all', cases: kind.id === 'shushi' };
+  // マーカー（v34.0、js/exam-marks.js）
+  if (typeof examMarksForDoc === 'function') opts.marks = examMarksForDoc(st.examType, st.year, st.subject, kind.id, doc.paras);
   html += '<div class="examDocBody">' + examDocsBodyHtml(doc.paras, opts) + '</div>';
   html += '<div class="examDocPanelFoot">'
     + '<button type="button" class="examReadBtn' + (read ? ' on' : '') + '" data-act="toggleRead" data-kind="' + kind.id + '">' + (read ? '✔ 読んだ' : '○ 読んだ印をつける') + '</button>'
@@ -571,6 +597,9 @@ async function renderExamDocs() {
     return;
   }
   const subjData = data.subjects && data.subjects[st.subject];
+  // マーカーを引くときに段落の文を引けるよう、今開いている資料の段落を覚えておく（js/exam-marks.js）
+  st.docParas = {};
+  EXAM_DOCS_KINDS.forEach(k => { if (subjData && subjData[k.id] && Array.isArray(subjData[k.id].paras)) st.docParas[k.id] = subjData[k.id].paras; });
   html += examDocsPracticeBarHtml(st, !!(subjData && subjData.mondai));
   if (st.message) html += '<div class="examDocMessage">' + escapeHtml(st.message) + '</div>';
   // タブ（狭い画面・タブ表示のとき）
@@ -588,16 +617,19 @@ async function renderExamDocs() {
     html += '<button type="button" class="examDocLayoutBtn" data-act="layout">' + (side ? '▤ タブで切り替える' : '▥ 3つ並べて読む') + '</button>';
   }
   html += '</div>';
+  if (typeof examMarksToolsHtml === 'function') html += examMarksToolsHtml(view);
   if (side) {
     html += '<div class="examDocSide">' + EXAM_DOCS_KINDS.map(k => examDocsPanelHtml(st, data, k, view, readMap, locked && k.id !== 'mondai')).join('') + '</div>';
   } else {
     const k = examDocsKind(st.kind);
     html += examDocsPanelHtml(st, data, k, view, readMap, locked && k.id !== 'mondai');
   }
+  if (typeof examMarksListHtml === 'function') html += examMarksListHtml(st, subjData, locked);
   html += examDocsRelatedHtml(st);
   // 1列で読むときは、横に長くならないよう幅をおさえて中央に置く（v32.2）
   if (!side) html = '<div class="examDocReadCol">' + html + '</div>';
   els.view.innerHTML = html;
+  if (els.view.classList) els.view.classList.toggle('examMarkTapOn', !!view.mkTap);
   if (st.focusMinutes) {
     st.focusMinutes = false;
     const inp = document.getElementById('examDocMinutesOther');
@@ -610,9 +642,13 @@ async function renderExamDocs() {
     const pi = st.focusPara;
     st.focusPara = null;
     const panel = els.view.querySelector('.examDocPanel[data-kind="' + st.kind + '"]') || els.view;
-    const target = panel.querySelector('p[data-pi="' + pi + '"]');
+    const para = panel.querySelector('p[data-pi="' + pi + '"]');
+    // 「引いたところ」の一覧から開いたときは、そのマーカーに目印を付ける
+    const mark = st.focusMark != null && para ? para.querySelector('mark[data-mi="' + st.focusMark + '"]') : null;
+    st.focusMark = null;
+    const target = mark || para;
     if (target) {
-      target.classList.add('examDocFocus');
+      target.classList.add(mark ? 'examMarkFocus' : 'examDocFocus');
       try { target.scrollIntoView({ block: 'center' }); } catch (e) {}
     }
   }
@@ -820,6 +856,8 @@ async function examDocsSaveAll() {
 function examDocsHandleAction(el, evt) {
   const st = examDocsState;
   const act = el.dataset.act;
+  // マーカーの操作（js/exam-marks.js）
+  if (/^mk/.test(act || '')) { if (typeof examMarksHandleAction === 'function') examMarksHandleAction(el); return; }
   if (act === 'close') { closeExamDocs(); return; }
   if (act === 'home') { st.year = null; st.message = ''; renderExamDocs(); return; }
   if (act === 'homeExam') { st.examType = el.dataset.exam; renderExamDocs(); return; }
@@ -939,6 +977,11 @@ function examDocsHandleChange(el) {
     const m = examDocsParseMinutes(el.value);
     if (m != null) { el.value = m; examDocsSaveMinutes(m); }
     return;
+  } else if (act === 'mkTap') {
+    const v = loadExamDocsView();
+    v.mkTap = !!el.checked;
+    saveExamDocsView(v);
+    if (typeof examMarksHideBar === 'function') examMarksHideBar();
   } else if (act === 'toggleHl') {
     const v = loadExamDocsView();
     v.hl = !!el.checked;
@@ -966,6 +1009,8 @@ function initExamDocsFeature() {
     if (!e.target || !e.target.closest) return;
     // 条文リンクは document の委任リスナーに任せる（ここでは止めない）
     if (e.target.closest('.lawRef')) return;
+    // 本文のマーカーを押した・「文をタップで引く」で文を押した（js/exam-marks.js）
+    if (typeof examMarksHandleBodyClick === 'function' && examMarksHandleBodyClick(e)) return;
     const el = e.target.closest('[data-act]');
     if (!el || el.tagName === 'SELECT' || el.tagName === 'INPUT') return;
     examDocsHandleAction(el, e);
