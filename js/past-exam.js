@@ -2,6 +2,45 @@
    既存の entries / studyLog / manualLog / renderStudyTable などには一切触れていません。
    保存先も専用のキー 'ronshoPastExamLogs_v1' のみを使用します。 */
 const PAST_EXAM_LOG_KEY = 'ronshoPastExamLogs_v1';
+// 消したログの印（v34.2〜）。{ ログのkey: 消した時刻(ms) }。同期で2台のログを足し合わせる
+// とき（drive-sync.js の mergePastExamLogs）、消したログがほかの端末から戻らないように使う。
+// 各ログには at（付けた・メモを変えた時刻）を持たせ、消した時刻より新しいものだけ残す
+const PAST_EXAM_DELETED_KEY = 'ronshoPastExamDeletedV1';
+function loadPastExamDeleted() {
+  try {
+    const v = JSON.parse(localStorage.getItem(PAST_EXAM_DELETED_KEY) || '{}');
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  } catch (_) { return {}; }
+}
+// ログを1件消す（過去問ログの表・学習カレンダーの両方から使う）。消した印を残してから保存する
+function deletePastExamLog(key, now) {
+  const logs = loadPastExamLogs();
+  const idx = logs.findIndex(l => l.key === key);
+  if (idx === -1) return false;
+  logs.splice(idx, 1);
+  const del = loadPastExamDeleted();
+  del[key] = Math.max(Number(del[key]) || 0, now || Date.now());
+  localStorage.setItem(PAST_EXAM_DELETED_KEY, JSON.stringify(del));
+  savePastExamLogs(logs);
+  return true;
+}
+// 手動バックアップから戻すとき：戻すログのうち、この端末で「消した」ことになっているものは
+// 付け直した扱い（at を今に）にして、同期で消されないようにする。バックアップに入っている
+// 消した印は、今の印と合わせる（新しい方）
+function restorePastExamLogsFromBackup(logs, deleted, now) {
+  const t = now || Date.now();
+  const del = loadPastExamDeleted();
+  if (deleted && typeof deleted === 'object' && !Array.isArray(deleted)) {
+    Object.keys(deleted).forEach(k => { const v = Number(deleted[k]) || 0; if (v > (Number(del[k]) || 0)) del[k] = v; });
+  }
+  const out = (Array.isArray(logs) ? logs : []).map(l => {
+    if (!l || typeof l !== 'object') return l;
+    const key = l.key || ((l.examType || '予備試験') + '|' + l.subject + '|' + l.year + '|' + l.round + '|' + (l.date || ''));
+    return del[key] && del[key] >= (Number(l.at) || 0) ? Object.assign({}, l, { at: Math.max(t, del[key] + 1) }) : l;
+  });
+  localStorage.setItem(PAST_EXAM_DELETED_KEY, JSON.stringify(del));
+  savePastExamLogs(out);
+}
 // 「過去問ログ」タブを開いたときに最初から選ばれている種別を、設定画面
 // (js/settings.js)から変更できるようにする（drive-sync.jsで同期対象）
 const PAST_EXAM_DEFAULT_TYPE_KEY = 'ronshoPastExamDefaultTypeV1';
@@ -235,7 +274,9 @@ function upsertPastExamLogEntry(examType, subject, year, round, date) {
     year: year,
     round: round,
     date: date,
-    memo: existingIdx >= 0 ? (logs[existingIdx].memo || '') : ''
+    memo: existingIdx >= 0 ? (logs[existingIdx].memo || '') : '',
+    // 付けた時刻。同期で2台のログを合わせるとき、消した印より新しいかを見る
+    at: Date.now()
   };
   if (existingIdx >= 0) logs[existingIdx] = newItem; else logs.push(newItem);
   savePastExamLogs(logs);
@@ -490,11 +531,7 @@ function initPastExamLogFeature() {
   table.addEventListener('click', (e) => {
     const delBtn = e.target.closest('.pastDelBtn');
     if (delBtn) {
-      const logs = loadPastExamLogs();
-      const idx = logs.findIndex(l => l.key === delBtn.dataset.key);
-      if (idx === -1) return;
-      logs.splice(idx, 1);
-      savePastExamLogs(logs);
+      if (!deletePastExamLog(delBtn.dataset.key)) return;
       renderPastLogs();
       renderPastMatrixTable();
       return;
@@ -511,7 +548,10 @@ function initPastExamLogFeature() {
     const logs = loadPastExamLogs();
     const idx = logs.findIndex(l => l.key === cell.dataset.key);
     if (idx === -1) return;
-    logs[idx].memo = cell.textContent.trim();
+    const memo = cell.textContent.trim();
+    if ((logs[idx].memo || '') === memo) return;
+    logs[idx].memo = memo;
+    logs[idx].at = Date.now();
     savePastExamLogs(logs);
   }, true);
 

@@ -20,6 +20,8 @@
   const STUDYLOG_KEY = 'ronshoStudyLog';
   const MANUALLOG_KEY = 'ronshoManualLog';
   const PASTEXAM_KEY = 'ronshoPastExamLogs_v1';
+  // 過去問ログを消した印（v34.2〜）。{ ログのkey: 消した時刻(ms) }。足し合わせで消したログが戻らないように持つ
+  const PASTEXAM_DELETED_KEY = 'ronshoPastExamDeletedV1';
   const COUNTDOWN_KEY = 'ronshoCountdowns_v1';
   const DUPARCHIVE_KEY = 'ronshoDupArchiveV1';
   const DUPRESOLVED_KEY = 'ronshoDupResolvedV1';
@@ -74,6 +76,7 @@
   const OTHER_FIELD_LABELS = {
     manualLog: '📝 手動学習ログ',
     pastExamLogs: '📄 過去問ログ',
+    pastExamDeleted: '📄 過去問ログの削除の印',
     countdowns: '⏳ カウントダウン',
     dupArchive: '🗑 重複チェックのアーカイブ',
     dupResolved: '✅ 重複チェックの「両方残す」記録',
@@ -166,6 +169,7 @@
     studyLog: read(STUDYLOG_KEY, {}),
     manualLog: read(MANUALLOG_KEY, {}),
     pastExamLogs: read(PASTEXAM_KEY, []),
+    pastExamDeleted: read(PASTEXAM_DELETED_KEY, {}),
     countdowns: read(COUNTDOWN_KEY, []),
     dupArchive: read(DUPARCHIVE_KEY, []),
     dupResolved: read(DUPRESOLVED_KEY, []),
@@ -272,17 +276,67 @@
     });
     return out;
   }
-  const AUTO_MERGED_FIELDS = { lawHistory: mergeLawHistory };
+  // 「📄 過去問ログ」（v34.2〜）。以前は「その他の項目」としてどちらか片方の端末の分を
+  // まるごと採っていたため、2台の両方でログを付けると片方の分が消えていた。
+  // ログは key（種別|科目|年度|回数|解答日）ごとに足し合わせる。
+  //   ・同じkeyが両方にあれば、at（付けた・メモを変えた時刻）の新しい方。同じならメモの長い方
+  //   ・消したログは pastExamDeleted に { key: 消した時刻 } を残し、それより前の at のログは
+  //     どちらの端末にあっても入れない（消したログがほかの端末から戻らないように）。
+  //     消した後に同じログを付け直すと at の方が新しいので、また入る
+  //   ・at の無い古いログは 0 とみなす（消した印があれば消える）
+  const pastExamLogKey = l => (l.examType || '予備試験') + '|' + l.subject + '|' + l.year + '|' + l.round + '|' + (l.date || '');
+  function mergePastExamDeleted(a, b) {
+    a = isPlainObject(a) ? a : {};
+    b = isPlainObject(b) ? b : {};
+    const out = {};
+    new Set([...Object.keys(a), ...Object.keys(b)]).forEach(k => {
+      const t = Math.max(Number(a[k]) || 0, Number(b[k]) || 0);
+      if (t) out[k] = t;
+    });
+    return out;
+  }
+  function mergePastExamLogs(a, b, dataA, dataB) {
+    const del = mergePastExamDeleted((dataA || {}).pastExamDeleted, (dataB || {}).pastExamDeleted);
+    const byKey = new Map();
+    [a, b].forEach(list => {
+      (Array.isArray(list) ? list : []).forEach(l => {
+        if (!isPlainObject(l)) return;
+        const key = l.key || pastExamLogKey(l);
+        const item = l.key ? l : Object.assign({}, l, { key: key });
+        const cur = byKey.get(key);
+        if (!cur) { byKey.set(key, item); return; }
+        const ca = Number(cur.at) || 0, ia = Number(item.at) || 0;
+        if (ia !== ca) { if (ia > ca) byKey.set(key, item); return; }
+        const cm = String(cur.memo || '').length, im = String(item.memo || '').length;
+        if (im !== cm) { if (im > cm) byKey.set(key, item); return; }
+        if (canonicalJSON(item) > canonicalJSON(cur)) byKey.set(key, item);
+      });
+    });
+    return [...byKey.keys()].sort()
+      .map(k => byKey.get(k))
+      .filter(l => !(del[l.key] && del[l.key] >= (Number(l.at) || 0)));
+  }
+  // 自動で合わせる項目。合わせ方は (この項目の値a, 相手の値b, aのデータ全体, bのデータ全体)
+  // を受け取る（過去問ログは、同じデータの「削除の印」も見て消したログを除くため）
+  const AUTO_MERGED_FIELDS = {
+    lawHistory: mergeLawHistory,
+    pastExamLogs: mergePastExamLogs,
+    pastExamDeleted: mergePastExamDeleted
+  };
   // data（保存・送信するもの）の自動で合わせる項目を、other と足し合わせたものに置き換える
   function withAutoMerged(data, other) {
     const out = Object.assign({}, data);
-    Object.keys(AUTO_MERGED_FIELDS).forEach(k => { out[k] = AUTO_MERGED_FIELDS[k](data && data[k], other && other[k]); });
+    Object.keys(AUTO_MERGED_FIELDS).forEach(k => { out[k] = AUTO_MERGED_FIELDS[k](data && data[k], other && other[k], data, other); });
     return out;
   }
   // 自動で合わせる項目を、この端末に書き込む（同期フックは鳴らさない）
   function writeAutoMergedLocal(merged) {
     write(LAW_HISTORY_KEY, merged.lawHistory || {});
+    write(PASTEXAM_KEY, Array.isArray(merged.pastExamLogs) ? merged.pastExamLogs : []);
+    write(PASTEXAM_DELETED_KEY, isPlainObject(merged.pastExamDeleted) ? merged.pastExamDeleted : {});
     if (typeof renderLawHistoryIfShown === 'function') { try { renderLawHistoryIfShown(); } catch (_) {} }
+    if (typeof renderPastLogs === 'function') { try { renderPastLogs(); } catch (_) {} }
+    if (typeof renderPastMatrixTable === 'function') { try { renderPastMatrixTable(); } catch (_) {} }
   }
   // 論証などに実質の違いが無く、自動で合わせる項目だけが違っていた（または同じ）とき：
   // この端末に足し合わせた結果を書き、クラウドのrevisionに合わせる。足し合わせた
@@ -294,7 +348,7 @@
     localStorage.setItem(REVISION_KEY, String(revision));
     // 「最後に同期した状態」＝今のこの端末（足し合わせ後）の、自動で合わせる項目だけクラウドのもの
     const asCloud = snapshot();
-    Object.keys(AUTO_MERGED_FIELDS).forEach(k => { asCloud[k] = AUTO_MERGED_FIELDS[k]((remoteData || {})[k], {}); });
+    Object.keys(AUTO_MERGED_FIELDS).forEach(k => { asCloud[k] = AUTO_MERGED_FIELDS[k]((remoteData || {})[k], undefined, remoteData || {}, {}); });
     markSynced(asCloud);
     const needsPush = Object.keys(AUTO_MERGED_FIELDS).some(k => canonicalJSON(merged[k]) !== canonicalJSON(asCloud[k]));
     if (needsPush) queue();
@@ -318,6 +372,7 @@
       write(STUDYLOG_KEY, data.studyLog || {});
       write(MANUALLOG_KEY, data.manualLog || {});
       write(PASTEXAM_KEY, data.pastExamLogs || []);
+      write(PASTEXAM_DELETED_KEY, isPlainObject(data.pastExamDeleted) ? data.pastExamDeleted : {});
       write(COUNTDOWN_KEY, data.countdowns || []);
       write(DUPARCHIVE_KEY, data.dupArchive || []);
       write(DUPRESOLVED_KEY, data.dupResolved || []);
@@ -393,8 +448,8 @@
   }
 
   // クラウド側のデータをそのまま採用する（この端末に未同期の変更が無いときのみ安全）
-  // 自動で合わせる項目（開いた条文）だけは、丸ごと採用するときも、この端末の分を
-  // 足し合わせて残す（クラウドを選んでも、この端末で開いた条文の記録は消えない）
+  // 自動で合わせる項目（開いた条文・過去問ログ）だけは、丸ごと採用するときも、この端末の分を
+  // 足し合わせて残す（クラウドを選んでも、この端末で開いた条文・付けた過去問ログは消えない）
   function adoptRemoteWholesale(remoteData, remoteRevision) {
     const before = snapshot();
     revision = remoteRevision;
@@ -756,7 +811,7 @@
     const merged = Object.assign({}, localData, { entries: finalEntries, studyLog: finalStudyLog });
     Object.keys(OTHER_FIELD_LABELS).forEach(k => { merged[k] = otherBase[k]; });
     // 開いた条文などの自動で合わせる項目は、どちらを選んでも両方を足し合わせる
-    Object.keys(AUTO_MERGED_FIELDS).forEach(k => { merged[k] = AUTO_MERGED_FIELDS[k](localData[k], (remoteData || {})[k]); });
+    Object.keys(AUTO_MERGED_FIELDS).forEach(k => { merged[k] = AUTO_MERGED_FIELDS[k](localData[k], (remoteData || {})[k], localData, remoteData || {}); });
     return merged;
   }
   // 編集競合でマージした論証タイトルを記録する。バナー→重複チェックで
@@ -1238,7 +1293,7 @@
   // 同期ロジックの自動テスト(tools/sync-test)から直接検証するための公開。アプリの動作には影響しない
   window.__ronshoSyncTest = {
     pushToCloud, pullFromCloud, snapshot, applyRemoteData, adoptRemoteWholesale,
-    hasUnsyncedLocalChanges, computeSyncDiff, canonicalJSON, mergeLawHistory,
+    hasUnsyncedLocalChanges, computeSyncDiff, canonicalJSON, mergeLawHistory, mergePastExamLogs, mergePastExamDeleted,
     showSyncConflictModal, hideSyncConflictModal, buildManualMergeSnapshot,
     isActivelyStudying, autoResolveConflictFavoringActiveStudy,
     getRevision: () => revision,
