@@ -4,6 +4,28 @@ let speechQueue = [];
 let speechIndex = 0;
 let speechIsPlaying = false;
 let speechGapTimer = null;
+// 読み上げを始める準備中（無音の音声が流れ始めるのを待っている間）か。この間は止まって
+// いるとは見なさない
+let speechPreparing = false;
+let speechPrepareId = 0;
+// 今読んでいる部分（'title' か 'body'）。読み直すときはこの部分の頭から読む
+let speechPart = 'title';
+// ほかのアプリの音で止めたとき、▶で続きから読む部分（無ければ null＝タイトルから）
+let speechResumePart = null;
+// 話しかけ（発話）の組の番号。自分で止めた・次へ進んだ後に、古い発話から遅れて届いた
+// 「終わった」「切られた」の知らせを無視するために使う
+let speechRunId = 0;
+// ▶を押した時刻と、その直後に声が切られたときの読み直しの回数
+let speechStartedAt = 0;
+let speechInterruptRetries = 0;
+// ▶を押してからこの時間のうちに声が切られたのは、音の種類の切り替えのせい（自分のせい）と
+// 見なしてすぐ読み直す。それより後に切られたのは、ほかのアプリ（作業用BGMなど）が音を
+// 使い始めたせいと見なして、読み直さずに止める（読み直すとBGMを止めてしまうため）
+const SPEECH_START_WINDOW_MS = 5000;
+const SPEECH_INTERRUPT_RETRY_MS = 500;
+const SPEECH_MAX_INTERRUPT_RETRIES = 3;
+// 無音の音声が流れ始めてから、話し始めるまでに置く間（音の切り替えが落ち着くのを待つ）
+const SPEECH_AUDIO_SETTLE_MS = 350;
 // 画面を真っ黒にしている最中か（下の「画面を真っ黒にするモード」で使う。ほかの関数からも見るため先に宣言する）
 let speechDarkOpen = false;
 // 真っ黒の間は見えない読み上げ画面を描き直さず、戻ったときに1回だけ描き直す
@@ -94,16 +116,30 @@ const SPEECH_WATCHDOG_MS = 3000;
 const SPEECH_MAX_STALL_RETRIES = 2;
 let speechWatchdogTimer = null;
 let speechStallRetries = 0;
+// 一時停止のまま固まっていたら、まず再開を試し、それでも次の見回りで固まっていたら
+// 今の部分（タイトル・本文）の頭から読み直す（iPadでは、ほかの音に割り込まれた後に
+// 再開を押しても声が戻らないことがあるため）
+let speechResumeTried = false;
 function speechWatchdogTick() {
   const synth = window.speechSynthesis;
-  if (!speechLooksStalled(synth)) return;
-  if (synth.paused) {
+  if (!speechLooksStalled(synth)) {
+    speechResumeTried = false;
+    return;
+  }
+  if (speechOtherAudioTookOver()) {
+    // ほかのアプリ（作業用BGMなど）が音を使い始めた。読み直すとその音を止めてしまうので、止める
+    pauseSpeechByOtherAudio();
+    return;
+  }
+  if (synth.paused && !speechResumeTried) {
+    speechResumeTried = true;
     try { synth.resume(); } catch (e) {}
     return;
   }
+  speechResumeTried = false;
   if (speechStallRetries >= SPEECH_MAX_STALL_RETRIES) return;
   speechStallRetries++;
-  speakCurrentEntry();
+  speakCurrentEntry(speechPart);
 }
 function startSpeechKeepAlive() {
   stopSpeechKeepAlive();
@@ -303,21 +339,53 @@ function setSpeechAudioSession(type) {
     if (typeof navigator !== 'undefined' && navigator.audioSession) navigator.audioSession.type = type;
   } catch (e) {}
 }
+// 無音の音声を流し始める（音の種類を「再生」に切り替える）と、iPadではその切り替えの間に
+// ほかのアプリ（作業用BGMなど）の音が止められ、同時に話し始めた読み上げの声が切られる
+// ことがある。そこで、止まっていた無音の音声を流し始めたときは「流れ始めた」約束を返し、
+// 読み上げはそれを待ってから話し始める（待つ必要が無いときは null）
+const SPEECH_AUDIO_READY_MAX_MS = 1500;
+// 無音の音声が本当に流れ始めたか（'playing' の知らせが来たか）。来ていたのに止まっていたら、
+// ほかのアプリが音を使い始めたしるし（speechOtherAudioTookOver）
+let speechSilentAudioConfirmed = false;
+function onSpeechSilentAudioPlaying() {
+  speechSilentAudioConfirmed = true;
+}
+function onSpeechSilentAudioPaused() {
+  if (!speechOtherAudioTookOver()) return;
+  pauseSpeechByOtherAudio();
+}
+function speechOtherAudioTookOver() {
+  return !!(speechIsPlaying && speechSilentAudio && speechSilentAudioConfirmed && speechSilentAudio.paused === true);
+}
 function startSpeechBackgroundAudio() {
-  if (!speechBackgroundEnabled()) return;
+  if (!speechBackgroundEnabled()) return null;
   setSpeechAudioSession('playback');
+  let ready = null;
   try {
     if (!speechSilentAudio) {
       speechSilentAudio = new Audio(buildSilentWavUrl());
       speechSilentAudio.loop = true;
       speechSilentAudio.setAttribute('playsinline', '');
+      try {
+        speechSilentAudio.addEventListener('playing', onSpeechSilentAudioPlaying);
+        speechSilentAudio.addEventListener('pause', onSpeechSilentAudioPaused);
+      } catch (e) {}
     }
+    const wasPlaying = speechSilentAudio.paused === false;
+    if (!wasPlaying) speechSilentAudioConfirmed = false;
     const p = speechSilentAudio.play();
-    if (p && p.catch) p.catch(() => {});
+    if (p && p.then) {
+      const settled = p.then(() => {}, () => {});
+      if (!wasPlaying) {
+        ready = Promise.race([settled, new Promise(resolve => setTimeout(resolve, SPEECH_AUDIO_READY_MAX_MS))]);
+      }
+    }
   } catch (e) {}
   setupSpeechMediaSession();
+  return ready;
 }
 function stopSpeechBackgroundAudio() {
+  speechSilentAudioConfirmed = false;
   if (speechSilentAudio) speechSilentAudio.pause();
   setSpeechAudioSession('auto');
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
@@ -372,6 +440,47 @@ function findSpeechVoice(voices, uri) {
   const list = speechJapaneseVoices(voices);
   return list.find(v => v.voiceURI === uri) || list.find(v => v.name === uri) || null;
 }
+// iPhone・iPadでは、同じ名前の声（例：Kyoko）が「軽量」「高音質」など音質違いで
+// 別々に入っていたり、同じ声が書き方の違うvoiceURIで2回届いたりして、選択肢に同じ
+// 名前が並んでしまう。名前と音質が同じものは1つにまとめ、名前が同じで音質が違うものは
+// 名前のあとに音質を書いて見分けられるようにする
+function speechVoiceQuality(v) {
+  const s = String((v && v.voiceURI) || '') + ' ' + String((v && v.name) || '');
+  if (/premium/i.test(s)) return 'プレミアム';
+  if (/enhanced/i.test(s)) return '高音質';
+  if (/compact/i.test(s)) return '軽量';
+  return '';
+}
+function speechVoiceLabelNote(notes) {
+  const list = notes.filter(Boolean);
+  return list.length ? '（' + list.join('・') + '）' : '';
+}
+function speechVoiceOptions(voices, savedUri) {
+  const groups = [];
+  const byKey = {};
+  speechJapaneseVoices(voices).forEach(v => {
+    const name = String(v.name || v.voiceURI || '');
+    const uri = String(v.voiceURI || v.name || '');
+    if (!uri) return;
+    const quality = speechVoiceQuality(v);
+    const key = name + '|' + quality;
+    let g = byKey[key];
+    if (!g) {
+      g = byKey[key] = { name, quality, uri, isDefault: false };
+      groups.push(g);
+    } else if (savedUri && uri === savedUri) {
+      // まとめた声のうち、選んであった方を残す（選択欄がその声を指せるように）
+      g.uri = uri;
+    }
+    if (v.default) g.isDefault = true;
+  });
+  const nameCount = {};
+  groups.forEach(g => { nameCount[g.name] = (nameCount[g.name] || 0) + 1; });
+  return groups.map(g => ({
+    uri: g.uri,
+    label: g.name + speechVoiceLabelNote([nameCount[g.name] > 1 ? g.quality : '', g.isDefault ? '標準' : ''])
+  }));
+}
 function speechAvailableVoices() {
   try { return window.speechSynthesis.getVoices() || []; } catch (e) { return []; }
 }
@@ -391,11 +500,8 @@ function renderSpeechVoiceSelect() {
   const voices = speechJapaneseVoices(speechAvailableVoices());
   const saved = loadSpeechVoiceUri();
   let html = '<option value="">おまかせ（端末の標準の声）</option>';
-  const seen = {};
-  voices.forEach(v => {
-    if (seen[v.voiceURI]) return;
-    seen[v.voiceURI] = true;
-    html += '<option value="' + escapeHtml(v.voiceURI) + '">' + escapeHtml(v.name) + (v.default ? '（標準）' : '') + '</option>';
+  speechVoiceOptions(voices, saved).forEach(o => {
+    html += '<option value="' + escapeHtml(o.uri) + '">' + escapeHtml(o.label) + '</option>';
   });
   const found = findSpeechVoice(voices, saved);
   if (saved && !found && voices.length > 0) {
@@ -564,16 +670,21 @@ function closeSpeechDarkScreen() {
 // 画面を消している間に端末が読み上げを止めてしまった場合、画面を点け直した
 // ときに、読んでいた論証の頭から読み直す（読み上げ中のまま無音で固まらないように）
 function speechLooksStalled(synth) {
-  if (!speechIsPlaying || speechGapTimer || !synth) return false;
+  if (!speechIsPlaying || speechGapTimer || speechPreparing || !synth) return false;
   if (synth.paused) return true;
   return !synth.speaking && !synth.pending;
 }
 function recoverStalledSpeech() {
   if (!speechLooksStalled(window.speechSynthesis)) return;
   if (speechQueue.length === 0) return;
+  if (speechOtherAudioTookOver()) {
+    // 作業用BGMなどに切り替えて戻ってきたときは、勝手に読み直してBGMを止めない
+    pauseSpeechByOtherAudio();
+    return;
+  }
   speechStallRetries = 0;
   startSpeechBackgroundAudio();
-  speakCurrentEntry();
+  speakCurrentEntry(speechPart);
 }
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible' || !speechIsPlaying) return;
@@ -782,82 +893,181 @@ function advanceSpeechAfterEntry() {
     renderSpeechStatus('🎉 すべて読み上げが終了しました。');
   }
 }
-function speakCurrentEntry() {
+function speechInterruptAction(now, startedAt, retries) {
+  if (now - startedAt <= SPEECH_START_WINDOW_MS && retries < SPEECH_MAX_INTERRUPT_RETRIES) return 'retry';
+  return 'pause';
+}
+function stopSpeechWithError() {
+  speechIsPlaying = false;
+  speechPreparing = false;
+  stopSpeechKeepAlive();
+  releaseSpeechWakeLock();
+  stopSpeechBackgroundAudio();
+  renderSpeechStatus('読み上げ中にエラーが発生しました。');
+}
+// 声が切られたとき（'interrupted'・'canceled'）。自分で止めたり次へ進んだりした場合は
+// 発話の組の番号が変わっているので何もしない
+function handleSpeechUtteranceError(evt, runId, part) {
+  if (runId !== speechRunId || !speechIsPlaying) return;
+  const err = evt && evt.error;
+  if (err !== 'interrupted' && err !== 'canceled') {
+    stopSpeechWithError();
+    return;
+  }
+  if (speechOtherAudioTookOver() || speechInterruptAction(Date.now(), speechStartedAt, speechInterruptRetries) === 'pause') {
+    pauseSpeechByOtherAudio(part);
+    return;
+  }
+  speechInterruptRetries++;
+  scheduleSpeechGap(() => {
+    if (speechIsPlaying && runId === speechRunId) speakCurrentEntry(part);
+  }, SPEECH_INTERRUPT_RETRY_MS);
+}
+// ほかのアプリ（作業用BGMなど）が音を使い始めたので、読み上げを止める。▶を押すと、
+// 止めたときに読んでいた部分（タイトル・本文）の頭から読む
+function pauseSpeechByOtherAudio(part) {
+  if (!speechIsPlaying) return;
+  speechResumePart = part || speechPart;
+  speechIsPlaying = false;
+  speechPreparing = false;
+  speechRunId++;
+  clearSpeechGapTimer();
+  stopSpeechKeepAlive();
+  try { window.speechSynthesis.cancel(); } catch (e) {}
+  releaseSpeechWakeLock();
+  stopSpeechBackgroundAudio();
+  renderSpeechStatus('⏸ ほかのアプリの音（作業用BGMなど）に切り替わったので、読み上げを止めました。「▶ 再生」を押すと、この論証の' + (speechResumePart === 'body' ? '本文' : 'タイトル') + 'から読みます。');
+}
+// startPart が 'body' なら、タイトルをとばして本文から読む
+function speakCurrentEntry(startPart) {
   if (!speechSupported()) {
     renderSpeechStatus('お使いのブラウザは読み上げ機能に対応していません。');
     return;
   }
   if (speechQueue.length === 0) return;
   const e = speechQueue[speechIndex];
+  speechPreparing = false;
+  const runId = ++speechRunId;
   renderSpeechCurrentCard();
   clearSpeechGapTimer();
-  window.speechSynthesis.cancel();
+  const synth = window.speechSynthesis;
+  synth.cancel();
+  // 一時停止のまま新しく話しかけても声が出ない端末があるため、一時停止を解いておく
+  try { if (synth.paused) synth.resume(); } catch (err) {}
   const rateSel = document.getElementById('speechRateSelect');
   const rate = rateSel ? Number(rateSel.value) || 1 : 1;
-  const titleUtterance = new SpeechSynthesisUtterance(speechTextFor(e.title));
-  applySpeechVoice(titleUtterance);
-  titleUtterance.rate = rate;
-  const bodyUtterance = new SpeechSynthesisUtterance(speechTextFor(e.body));
-  bodyUtterance.rate = rate;
-  titleUtterance.onend = () => {
-    if (!speechIsPlaying) return;
-    scheduleSpeechGap(() => {
-      if (!speechIsPlaying) return;
-      // 読み上げ中に声を選び直したときも、本文から新しい声になるよう、ここで当てる
-      applySpeechVoice(bodyUtterance);
-      window.speechSynthesis.speak(bodyUtterance);
-    }, SPEECH_TITLE_BODY_PAUSE_MS);
-  };
-  titleUtterance.onerror = (evt) => {
-    if (evt.error === 'interrupted' || evt.error === 'canceled') return;
-    speechIsPlaying = false;
-    stopSpeechKeepAlive();
-    releaseSpeechWakeLock();
-    stopSpeechBackgroundAudio();
-    renderSpeechStatus('読み上げ中にエラーが発生しました。');
-  };
-  bodyUtterance.onend = advanceSpeechAfterEntry;
-  bodyUtterance.onerror = (evt) => {
-    if (evt.error === 'interrupted' || evt.error === 'canceled') return;
-    speechIsPlaying = false;
-    stopSpeechKeepAlive();
-    releaseSpeechWakeLock();
-    stopSpeechBackgroundAudio();
-    renderSpeechStatus('読み上げ中にエラーが発生しました。');
+  const speakBody = () => {
+    if (!speechIsPlaying || runId !== speechRunId) return;
+    speechPart = 'body';
+    const bodyUtterance = new SpeechSynthesisUtterance(speechTextFor(e.body));
+    // 読み上げ中に声を選び直したときも、本文から新しい声になるよう、ここで当てる
+    applySpeechVoice(bodyUtterance);
+    bodyUtterance.rate = rate;
+    bodyUtterance.onend = () => {
+      if (runId !== speechRunId) return;
+      advanceSpeechAfterEntry();
+    };
+    bodyUtterance.onerror = (evt) => handleSpeechUtteranceError(evt, runId, 'body');
+    synth.speak(bodyUtterance);
   };
   renderSpeechStatus('🔊 読み上げ中… (' + (speechIndex + 1) + ' / ' + speechQueue.length + ')');
   startSpeechKeepAlive();
   setupSpeechMediaSession();
-  window.speechSynthesis.speak(titleUtterance);
+  if (startPart === 'body') {
+    speakBody();
+    return;
+  }
+  speechPart = 'title';
+  const titleUtterance = new SpeechSynthesisUtterance(speechTextFor(e.title));
+  applySpeechVoice(titleUtterance);
+  titleUtterance.rate = rate;
+  titleUtterance.onend = () => {
+    if (!speechIsPlaying || runId !== speechRunId) return;
+    scheduleSpeechGap(speakBody, SPEECH_TITLE_BODY_PAUSE_MS);
+  };
+  titleUtterance.onerror = (evt) => handleSpeechUtteranceError(evt, runId, 'title');
+  synth.speak(titleUtterance);
+}
+// iPhone・iPadでは、ページで最初の読み上げは画面を押した瞬間に始めないと声が出ない。
+// 無音の音声を待ってから話し始めるときのために、押した瞬間に無音の発話を1つ入れておく
+// （話し始めるときに取り消すので、声には出ない）
+function unlockSpeechSynthesis() {
+  try {
+    const u = new SpeechSynthesisUtterance('');
+    u.volume = 0;
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
 }
 function startSpeech() {
   if (!speechSupported()) {
     renderSpeechStatus('お使いのブラウザは読み上げ機能に対応していません。');
     return;
   }
+  const synth = window.speechSynthesis;
   acquireSpeechWakeLock();
-  startSpeechBackgroundAudio();
   speechStallRetries = 0;
-  if (window.speechSynthesis.paused && speechQueue.length > 0) {
-    window.speechSynthesis.resume();
-    speechIsPlaying = true;
-    startSpeechKeepAlive();
-    renderSpeechStatus('🔊 読み上げ中… (' + (speechIndex + 1) + ' / ' + speechQueue.length + ')');
-    return;
-  }
-  if (speechQueue.length === 0) {
-    speechQueue = buildSpeechQueue();
-    speechIndex = 0;
-  } else {
-    speechIndex = Math.min(speechIndex, speechQueue.length - 1);
+  speechInterruptRetries = 0;
+  speechResumeTried = false;
+  speechStartedAt = Date.now();
+  // 一時停止から続ける（ほかのアプリの音で止めたときは、止めた部分の頭から読み直す）
+  const resumePaused = !speechResumePart && speechQueue.length > 0 && synth.paused && (synth.speaking || synth.pending);
+  if (!resumePaused) {
+    if (speechQueue.length === 0) {
+      speechQueue = buildSpeechQueue();
+      speechIndex = 0;
+      speechResumePart = null;
+    } else {
+      speechIndex = Math.min(speechIndex, speechQueue.length - 1);
+    }
   }
   speechIsPlaying = true;
-  renderSpeechCurrentCard();
-  speakCurrentEntry();
+  const go = () => {
+    if (resumePaused) {
+      try { synth.resume(); } catch (e) {}
+      startSpeechKeepAlive();
+      setupSpeechMediaSession();
+      renderSpeechStatus('🔊 読み上げ中… (' + (speechIndex + 1) + ' / ' + speechQueue.length + ')');
+      return;
+    }
+    if (speechQueue.length === 0) {
+      // 読む論証が無い（科目・分野などの絞り込みで0件）。カードに案内が出る
+      speechIsPlaying = false;
+      stopSpeechKeepAlive();
+      releaseSpeechWakeLock();
+      stopSpeechBackgroundAudio();
+      renderSpeechCurrentCard();
+      renderSpeechStatus('');
+      return;
+    }
+    const part = speechResumePart || 'title';
+    speechResumePart = null;
+    renderSpeechCurrentCard();
+    speakCurrentEntry(part);
+  };
+  const ready = startSpeechBackgroundAudio();
+  if (!ready) {
+    go();
+    return;
+  }
+  // 無音の音声が流れ始め、音の切り替えが落ち着いてから話し始める（作業用BGMなどを
+  // 止める切り替えの最中に話し始めると、声が切られて黙ってしまうため）
+  if (!resumePaused) unlockSpeechSynthesis();
+  speechPreparing = true;
+  const prepareId = ++speechPrepareId;
+  renderSpeechStatus('🔊 読み上げの準備中…');
+  if (!resumePaused) renderSpeechCurrentCard();
+  ready.then(() => {
+    setTimeout(() => {
+      if (prepareId !== speechPrepareId || !speechPreparing || !speechIsPlaying) return;
+      speechPreparing = false;
+      go();
+    }, SPEECH_AUDIO_SETTLE_MS);
+  });
 }
 function pauseSpeech() {
   if (!speechSupported()) return;
   speechIsPlaying = false;
+  speechPreparing = false;
   clearSpeechGapTimer();
   stopSpeechKeepAlive();
   window.speechSynthesis.pause();
@@ -868,9 +1078,15 @@ function pauseSpeech() {
 function stopSpeech() {
   if (!speechSupported()) return;
   speechIsPlaying = false;
+  speechPreparing = false;
+  speechResumePart = null;
+  speechRunId++;
   clearSpeechGapTimer();
   stopSpeechKeepAlive();
-  window.speechSynthesis.cancel();
+  const synth = window.speechSynthesis;
+  synth.cancel();
+  // 一時停止のまま止めると、次の▶で「続きから」と見なされて声が出ないため解いておく
+  try { if (synth.paused) synth.resume(); } catch (e) {}
   releaseSpeechWakeLock();
   stopSpeechBackgroundAudio();
   renderSpeechStatus('⏹ 停止しました');
@@ -879,6 +1095,9 @@ function speechStep(delta) {
   if (speechQueue.length === 0) return;
   const wasPlaying = speechIsPlaying;
   speechIsPlaying = false;
+  speechPreparing = false;
+  speechResumePart = null;
+  speechRunId++;
   clearSpeechGapTimer();
   window.speechSynthesis.cancel();
   speechIndex = Math.min(Math.max(speechIndex + delta, 0), speechQueue.length - 1);
