@@ -486,6 +486,121 @@ console.log('\n■ 読み上げ：声の選択・画面オフ対策');
   eq('停止・一時停止の後は読み直さない', sp('globalThis.__speak'), 2);
 }
 
+console.log('\n■ 読み上げ：声の重複・作業用BGMからの切り替え（v34.3）');
+{
+  const sp = loadApp(['js/core.js', 'js/speech.js']);
+  // iPadでは同じ「Kyoko」が音質違い・書き方違いのvoiceURIで何度も届き、選択肢に同じ名前が並んでいた
+  const voices = [
+    { name: 'Kyoko', lang: 'ja-JP', voiceURI: 'com.apple.voice.compact.ja-JP.Kyoko', default: false },
+    { name: 'Kyoko', lang: 'ja-JP', voiceURI: 'com.apple.voice.enhanced.ja-JP.Kyoko', default: false },
+    { name: 'Kyoko', lang: 'ja-JP', voiceURI: 'com.apple.ttsbundle.Kyoko-compact', default: false },
+    { name: 'Kyoko', lang: 'ja-JP', voiceURI: 'com.apple.voice.compact.ja-JP.Kyoko', default: false },
+    { name: 'O-Ren', lang: 'ja-JP', voiceURI: 'com.apple.voice.compact.ja-JP.O-ren', default: true },
+    { name: 'Hattori', lang: 'ja-JP', voiceURI: 'com.apple.voice.compact.ja-JP.Hattori', default: false },
+    { name: 'Samantha', lang: 'en-US', voiceURI: 'com.apple.voice.compact.en-US.Samantha', default: false }
+  ];
+  const opts = sp('speechVoiceOptions');
+  const o1 = opts(voices, '');
+  eq('同じ名前・同じ音質の声は1つにまとめ、音質違いは書き分ける', o1.map(o => o.label), ['Kyoko（軽量）', 'Kyoko（高音質）', 'O-Ren（標準）', 'Hattori']);
+  eq('音質と標準の両方があれば並べて書く', opts([Object.assign({}, voices[0], { default: true }), voices[1]], '').map(o => o.label), ['Kyoko（軽量・標準）', 'Kyoko（高音質）']);
+  eq('選択肢の値は、まとめた声の最初のvoiceURI', o1[0].uri, 'com.apple.voice.compact.ja-JP.Kyoko');
+  const o2 = opts(voices, 'com.apple.ttsbundle.Kyoko-compact');
+  eq('まとめた声のうち選んであった方を選択肢の値にする（選択欄がその声を指せる）', o2[0].uri, 'com.apple.ttsbundle.Kyoko-compact');
+  eq('名前が1つしかない声には音質を付けない', opts([voices[1]], '').map(o => o.label), ['Kyoko']);
+  eq('音質', [sp('speechVoiceQuality')({ voiceURI: 'com.apple.voice.premium.ja-JP.Kyoko' }), sp('speechVoiceQuality')({ voiceURI: 'Google 日本語' })], ['プレミアム', '']);
+
+  // ▶を押した直後に声が切られたのは音の切り替えのせい → すぐ読み直す。それ以降はBGMに切り替えたと見なす
+  const act = sp('speechInterruptAction');
+  eq('▶の直後に切られたらすぐ読み直す', act(10000 + 1200, 10000, 0), 'retry');
+  eq('直後でも読み直しは3回まで', act(10000 + 1200, 10000, 3), 'pause');
+  eq('しばらく読んだ後に切られたら止める（BGMを止め返さない）', act(10000 + 60000, 10000, 0), 'pause');
+
+  sp(`
+    globalThis.__status = '';
+    renderSpeechStatus = (t) => { globalThis.__status = t; };
+    renderSpeechCurrentCard = () => {};
+    globalThis.__speakArgs = [];
+    globalThis.__realSpeak = speakCurrentEntry;
+    speakCurrentEntry = (part) => { __speakArgs.push(part === undefined ? 'title' : part); };
+    globalThis.__timers = [];
+    setTimeout = (fn) => { __timers.push(fn); return __timers.length; };
+    clearTimeout = () => {};
+    globalThis.__synth = { speaking: false, pending: false, paused: false, canceled: 0, resumed: 0, spoken: [],
+      speak(u) { this.spoken.push(u); }, cancel() { this.canceled++; }, resume() { this.resumed++; }, pause() {} };
+    speechSynthesis = __synth;
+    navigator.audioSession = { type: 'playback' };
+    speechQueue = [{ title: 'T', body: 'B' }, { title: 'T2', body: 'B2' }];
+    speechIndex = 0;
+  `);
+  // 切られた知らせ：自分で止めた・次へ進んだ後の古い発話の知らせは無視する
+  sp('speechIsPlaying = true; speechRunId = 5; speechStartedAt = Date.now(); speechInterruptRetries = 0; speechGapTimer = null;');
+  sp('handleSpeechUtteranceError({ error: "interrupted" }, 4, "title")');
+  eq('古い発話の「切られた」は無視する', [sp('__timers.length'), sp('speechIsPlaying')], [0, true]);
+  sp('handleSpeechUtteranceError({ error: "interrupted" }, 5, "body")');
+  sp('speechGapTimer = null; __timers.shift()()');
+  eq('▶の直後に切られたら、切られた部分（本文）からすぐ読み直す', [sp('__speakArgs'), sp('speechInterruptRetries'), sp('speechIsPlaying')], [['body'], 1, true]);
+  sp('speechStartedAt = Date.now() - 60000;');
+  sp('handleSpeechUtteranceError({ error: "interrupted" }, 5, "body")');
+  eq('読んでいる途中で切られたら（BGMを流し始めた）読み直さずに止める', [sp('speechIsPlaying'), sp('__timers.length'), sp('speechResumePart')], [false, 0, 'body']);
+  eq('止めたら音の種類を標準に戻す（BGMを止めっぱなしにしない）', sp('navigator.audioSession.type'), 'auto');
+  check('止めた理由を出す', /作業用BGM/.test(sp('__status')) && /本文から/.test(sp('__status')), sp('__status'));
+  eq('止めた後に古い発話の知らせが来ても何もしない', (sp('handleSpeechUtteranceError({ error: "interrupted" }, 5, "body")'), sp('speechIsPlaying')), false);
+
+  // 無音の音声が流れていたのに止まった＝ほかのアプリ（作業用BGMなど）が音を使い始めた
+  sp('speechSilentAudio = { paused: false, play() { this.paused = false; return Promise.resolve(); }, pause() { this.paused = true; } };');
+  sp('speechIsPlaying = true; speechResumePart = null; speechPart = "title"; speechSilentAudioConfirmed = false; speechSilentAudio.paused = true; onSpeechSilentAudioPaused();');
+  eq('無音の音声が一度も流れていなければ（再生を断られた等）止めない', sp('speechIsPlaying'), true);
+  sp('speechSilentAudioConfirmed = true; onSpeechSilentAudioPaused();');
+  eq('流れていた無音の音声が止められたら、読み上げも止める', [sp('speechIsPlaying'), sp('speechResumePart')], [false, 'title']);
+  sp('speechIsPlaying = true; speechResumePart = null; speechSilentAudio.paused = false; speechSilentAudioConfirmed = true; onSpeechSilentAudioPaused();');
+  eq('自分で止めた直後に▶を押した（もう流れている）なら止めない', sp('speechIsPlaying'), true);
+
+  // 見張り役：BGMに切り替わっていたら、読み直して（BGMを止めて）しまわない
+  sp('__speakArgs.length = 0; speechIsPlaying = true; speechGapTimer = null; speechPreparing = false; speechStallRetries = 0; speechPart = "body";');
+  sp('speechSilentAudio.paused = true; speechSilentAudioConfirmed = true; speechWatchdogTick();');
+  eq('見張り役もBGMに切り替わっていたら読み直さずに止める', [sp('__speakArgs.length'), sp('speechIsPlaying'), sp('speechResumePart')], [0, false, 'body']);
+  sp('speechIsPlaying = true; speechSilentAudioConfirmed = false; speechStallRetries = 0; speechWatchdogTick();');
+  eq('見張り役が読み直すときは、今の部分（本文）の頭から', sp('__speakArgs'), ['body']);
+  // 一時停止のまま固まっていたら、まず再開、だめなら読み直す
+  sp('__speakArgs.length = 0; speechStallRetries = 0; speechResumeTried = false; __synth.paused = true; __synth.speaking = true;');
+  sp('speechWatchdogTick()');
+  eq('一時停止で固まっていたら、まず再開を試す', [sp('__synth.resumed'), sp('__speakArgs.length')], [1, 0]);
+  sp('speechWatchdogTick()');
+  eq('再開しても固まったままなら、今の部分から読み直す', [sp('__synth.resumed'), sp('__speakArgs')], [1, ['body']]);
+  sp('__synth.paused = false; __synth.speaking = false;');
+  // 準備中（無音の音声を待っている間）は止まっていると見なさない
+  sp('speechPreparing = true;');
+  eq('準備中は止まっていると見なさない', sp('speechLooksStalled(__synth)'), false);
+  sp('speechPreparing = false; speechIsPlaying = false;');
+
+  // 止めた後の▶は、止めた部分から読む
+  sp('__speakArgs.length = 0; speechResumePart = "body"; startSpeechBackgroundAudio = () => null; acquireSpeechWakeLock = () => Promise.resolve(false); startSpeech();');
+  eq('BGMで止めた後の▶は、止めた部分（本文）から読む', [sp('__speakArgs'), sp('speechResumePart'), sp('speechIsPlaying')], [['body'], null, true]);
+  sp('stopSpeech(); __speakArgs.length = 0; startSpeech();');
+  eq('停止した後の▶はタイトルから', sp('__speakArgs'), ['title']);
+  sp('speechIsPlaying = false; speechResumePart = "body"; speechStep(1);');
+  eq('次の論証へ移ったら、続きの印は消す', [sp('speechResumePart'), sp('speechIndex')], [null, 1]);
+
+  // 本物の speakCurrentEntry：本文から読む・古い発話の「終わった」を無視する
+  sp(`
+    speakCurrentEntry = __realSpeak;
+    SpeechSynthesisUtterance = function (t) { this.text = t; };
+    speechTextFor = (t) => t;
+    applySpeechVoice = () => {};
+    startSpeechKeepAlive = () => {}; setupSpeechMediaSession = () => {};
+    __synth.spoken.length = 0; __timers.length = 0;
+    speechIndex = 0; speechIsPlaying = true;
+    __synth.paused = true;
+    speakCurrentEntry('body');
+  `);
+  eq('本文から読むときはタイトルをとばす', sp('__synth.spoken.map(u => u.text)'), ['B']);
+  check('一時停止のままなら解いてから話す（声が出ないのを防ぐ）', sp('__synth.resumed') >= 2);
+  sp('__synth.paused = false; __synth.spoken.length = 0; speakCurrentEntry();');
+  sp('globalThis.__oldTitle = __synth.spoken[0]; speakCurrentEntry(); __synth.spoken.length = 0; __timers.length = 0; __oldTitle.onend();');
+  eq('取り消した古いタイトルの「終わった」では本文を読まない（二重に読まない）', [sp('__timers.length'), sp('__synth.spoken.length')], [0, 0]);
+  sp('speechIsPlaying = false;');
+}
+
 console.log('\n■ 読み上げ：画面を真っ黒にするモード');
 {
   const sp = loadApp(['js/core.js', 'js/speech.js']);
@@ -761,6 +876,68 @@ async function runAsyncChecks() {
     eq('取れなかったら false を返す（真っ黒の画面に自動ロックの設定を案内する）', await sp('acquireSpeechWakeLock()'), false);
     sp('delete navigator.wakeLock;');
     eq('Wake Lock に対応していない端末でも false を返す', await sp('acquireSpeechWakeLock()'), false);
+  }
+
+  console.log('\n■ 読み上げ：無音の音声が流れ始めてから話し始める（v34.3）');
+  {
+    const sp = loadApp(['js/core.js', 'js/speech.js']);
+    sp(`
+      globalThis.__status = '';
+      renderSpeechStatus = (t) => { globalThis.__status = t; };
+      renderSpeechCurrentCard = () => {};
+      globalThis.__speakArgs = [];
+      speakCurrentEntry = (part) => { __speakArgs.push(part === undefined ? 'title' : part); speechPreparing = false; };
+      globalThis.__timers = [];
+      setTimeout = (fn) => { __timers.push(fn); return __timers.length; };
+      clearTimeout = () => {};
+      SpeechSynthesisUtterance = function (t) { this.text = t; };
+      globalThis.__synth = { speaking: false, pending: false, paused: false, spoken: [], speak(u) { this.spoken.push(u); }, cancel() {}, resume() {}, pause() {} };
+      speechSynthesis = __synth;
+      acquireSpeechWakeLock = () => Promise.resolve(false);
+      setupSpeechMediaSession = () => {};
+      speechBackgroundEnabled = () => true;
+      navigator.audioSession = { type: 'auto' };
+      globalThis.__resolvePlay = null;
+      speechSilentAudio = { paused: true, play() { this.paused = false; return new Promise(r => { globalThis.__resolvePlay = r; }); }, pause() { this.paused = true; } };
+      speechQueue = [{ title: 'T', body: 'B' }, { title: 'T2', body: 'B2' }];
+      speechIndex = 0;
+    `);
+    sp('startSpeech()');
+    eq('無音の音声が流れ始めるまでは話し始めない', sp('__speakArgs.length'), 0);
+    eq('音の種類は先に「再生」にする', sp('navigator.audioSession.type'), 'playback');
+    check('準備中と出す', /準備中/.test(sp('__status')), sp('__status'));
+    eq('押した瞬間に無音の発話を1つ入れる（iPadで声が出るように）', sp('__synth.spoken.map(u => [u.text, u.volume])'), [['', 0]]);
+    eq('準備中は見張り役が読み直さない', sp('speechLooksStalled(__synth)'), false);
+    sp('__resolvePlay()');
+    await new Promise(r => setImmediate(r));
+    eq('流れ始めてから、少し間を置いて話し始める', [sp('__timers.length'), sp('__speakArgs.length')], [2, 0]);
+    sp('__timers[1]()');
+    eq('間を置いた後にタイトルから話し始める', sp('__speakArgs'), ['title']);
+    // 準備中に「次へ」を押したら、準備が終わっても二重に話さない
+    sp('stopSpeech(); __speakArgs.length = 0; __timers.length = 0; startSpeech();');
+    sp('speechStep(1)');
+    eq('準備中に次へ進んだら、すぐ次の論証を読む', sp('__speakArgs'), ['title']);
+    sp('__resolvePlay()');
+    await new Promise(r => setImmediate(r));
+    sp('__timers.forEach(fn => fn())');
+    eq('準備が終わっても二重に話さない', sp('__speakArgs'), ['title']);
+    // 準備中に一時停止したら、準備が終わっても話さない
+    sp('stopSpeech(); __speakArgs.length = 0; __timers.length = 0; startSpeech(); pauseSpeech();');
+    sp('__resolvePlay()');
+    await new Promise(r => setImmediate(r));
+    sp('__timers.forEach(fn => fn())');
+    eq('準備中に一時停止したら話さない', [sp('__speakArgs.length'), sp('speechIsPlaying')], [0, false]);
+    // 無音の音声が流れなくても（再生を断られた等）、長く待たずに話し始める
+    sp('stopSpeech(); __speakArgs.length = 0; __timers.length = 0; speechSilentAudio.play = function () { return Promise.reject(new Error("NotAllowedError")); }; startSpeech();');
+    await new Promise(r => setImmediate(r));
+    sp('__timers.slice().forEach(fn => fn())');
+    eq('無音の音声を断られても話し始める', sp('__speakArgs'), ['title']);
+    // 「画面オフでも続ける」を外していれば、待たずにすぐ話す
+    sp('stopSpeech(); __speakArgs.length = 0; speechBackgroundEnabled = () => false; startSpeech();');
+    eq('「画面オフでも続ける」を外していれば待たずにすぐ話す', sp('__speakArgs'), ['title']);
+    // 読む論証が0件なら「準備中」のまま残さない
+    sp('stopSpeech(); __speakArgs.length = 0; speechQueue = []; buildSpeechQueue = () => []; startSpeech();');
+    eq('読む論証が0件なら読み上げ中にしない', [sp('__speakArgs.length'), sp('speechIsPlaying'), sp('__status')], [0, false, '']);
   }
 
   console.log('\n■ バックアップ：端末への保存の結果');
