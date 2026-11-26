@@ -512,8 +512,10 @@ console.log('\n■ 読み上げ：声の重複・作業用BGMからの切り替�
   // ▶を押した直後に声が切られたのは音の切り替えのせい → すぐ読み直す。それ以降はBGMに切り替えたと見なす
   const act = sp('speechInterruptAction');
   eq('▶の直後に切られたらすぐ読み直す', act(10000 + 1200, 10000, 0), 'retry');
-  eq('直後でも読み直しは3回まで', act(10000 + 1200, 10000, 3), 'pause');
-  eq('しばらく読んだ後に切られたら止める（BGMを止め返さない）', act(10000 + 60000, 10000, 0), 'pause');
+  // v34.4：すぐには止めず、少し待ってからBGMに切り替わったかを見分ける（'check'）。v34.3 はすぐ止めて（'pause'）いたため、
+  // iPadで読み上げの声と無音の音声が音を取り合っただけでも止まっていた
+  eq('直後でも読み直しは3回まで（その後は見分ける）', act(10000 + 1200, 10000, 3), 'check');
+  eq('しばらく読んだ後に切られたら、すぐ読み直さずに見分ける（BGMを止め返さない）', act(10000 + 60000, 10000, 0), 'check');
 
   sp(`
     globalThis.__status = '';
@@ -541,7 +543,9 @@ console.log('\n■ 読み上げ：声の重複・作業用BGMからの切り替�
   eq('▶の直後に切られたら、切られた部分（本文）からすぐ読み直す', [sp('__speakArgs'), sp('speechInterruptRetries'), sp('speechIsPlaying')], [['body'], 1, true]);
   sp('speechStartedAt = Date.now() - 60000;');
   sp('handleSpeechUtteranceError({ error: "interrupted" }, 5, "body")');
-  eq('読んでいる途中で切られたら（BGMを流し始めた）読み直さずに止める', [sp('speechIsPlaying'), sp('__timers.length'), sp('speechResumePart')], [false, 0, 'body']);
+  eq('読んでいる途中で切られたら、すぐには止めず少し待つ', [sp('speechIsPlaying'), sp('__timers.length'), sp('speechGapTimer !== null')], [true, 1, true]);
+  sp('__timers.shift()()');
+  eq('読んでいる途中で切られ、無音の音声も無ければ（BGMを流し始めた）読み直さずに止める', [sp('speechIsPlaying'), sp('__timers.length'), sp('speechResumePart')], [false, 0, 'body']);
   eq('止めたら音の種類を標準に戻す（BGMを止めっぱなしにしない）', sp('navigator.audioSession.type'), 'auto');
   check('止めた理由を出す', /作業用BGM/.test(sp('__status')) && /本文から/.test(sp('__status')), sp('__status'));
   eq('止めた後に古い発話の知らせが来ても何もしない', (sp('handleSpeechUtteranceError({ error: "interrupted" }, 5, "body")'), sp('speechIsPlaying')), false);
@@ -550,10 +554,12 @@ console.log('\n■ 読み上げ：声の重複・作業用BGMからの切り替�
   sp('speechSilentAudio = { paused: false, play() { this.paused = false; return Promise.resolve(); }, pause() { this.paused = true; } };');
   sp('speechIsPlaying = true; speechResumePart = null; speechPart = "title"; speechSilentAudioConfirmed = false; speechSilentAudio.paused = true; onSpeechSilentAudioPaused();');
   eq('無音の音声が一度も流れていなければ（再生を断られた等）止めない', sp('speechIsPlaying'), true);
-  sp('speechSilentAudioConfirmed = true; onSpeechSilentAudioPaused();');
-  eq('流れていた無音の音声が止められたら、読み上げも止める', [sp('speechIsPlaying'), sp('speechResumePart')], [false, 'title']);
+  sp('__timers.length = 0; speechSilentAudioConfirmed = true; __synth.speaking = false; onSpeechSilentAudioPaused();');
+  eq('無音の音声が止められても、すぐには止めない', [sp('speechIsPlaying'), sp('__timers.length')], [true, 1]);
+  sp('__timers.shift()()');
+  eq('流れていた無音の音声が止められ、声も止まっていたら、読み上げも止める', [sp('speechIsPlaying'), sp('speechResumePart')], [false, 'title']);
   sp('speechIsPlaying = true; speechResumePart = null; speechSilentAudio.paused = false; speechSilentAudioConfirmed = true; onSpeechSilentAudioPaused();');
-  eq('自分で止めた直後に▶を押した（もう流れている）なら止めない', sp('speechIsPlaying'), true);
+  eq('自分で止めた直後に▶を押した（もう流れている）なら止めない', [sp('speechIsPlaying'), sp('__timers.length')], [true, 0]);
 
   // 見張り役：BGMに切り替わっていたら、読み直して（BGMを止めて）しまわない
   sp('__speakArgs.length = 0; speechIsPlaying = true; speechGapTimer = null; speechPreparing = false; speechStallRetries = 0; speechPart = "body";');
@@ -598,6 +604,80 @@ console.log('\n■ 読み上げ：声の重複・作業用BGMからの切り替�
   sp('__synth.paused = false; __synth.spoken.length = 0; speakCurrentEntry();');
   sp('globalThis.__oldTitle = __synth.spoken[0]; speakCurrentEntry(); __synth.spoken.length = 0; __timers.length = 0; __oldTitle.onend();');
   eq('取り消した古いタイトルの「終わった」では本文を読まない（二重に読まない）', [sp('__timers.length'), sp('__synth.spoken.length')], [0, 0]);
+  sp('speechIsPlaying = false;');
+}
+
+console.log('\n■ 読み上げ：声と無音の音声がぶつかっても止めない・読み上げの記録（v34.4）');
+{
+  const sp = loadApp(['js/core.js', 'js/speech.js']);
+  // ユーザーの報告：BGMを止めて読み上げに切り替えても、読み上げがすぐ止まる。
+  // iPadでは、話し始めた読み上げの声が無音の音声を止める（またはその逆）ことがあり、v34.3 はそれを
+  // 「ほかのアプリに切り替わった」と見なして止めていた
+  const verdict = sp('speechSilentPauseVerdict');
+  eq('無音の音声が止められても、声が出続けていれば続ける', verdict({ speaking: true, paused: false, pending: false }, false), 'keep');
+  eq('声も止まっていれば止める（BGMに切り替わった）', verdict({ speaking: false, paused: false, pending: false }, false), 'pause');
+  eq('声が一時停止にされていれば止める', verdict({ speaking: true, paused: true, pending: false }, false), 'pause');
+  eq('間を置いている・準備中はもう少し見る', verdict({ speaking: false, paused: false, pending: false }, true), 'wait');
+  eq('話し始める直前（待ち）はもう少し見る', verdict({ speaking: false, paused: false, pending: true }, false), 'wait');
+  const late = sp('speechLateInterruptVerdict');
+  eq('無音の音声が止められていれば止める', late(true, false, 0), 'pause');
+  eq('無音の音声が流れたまま声だけ切られたら（自分の音のせい）読み直す', late(false, true, 0), 'retry');
+  eq('読み直しは1つの論証で3回まで', late(false, true, 3), 'pause');
+  eq('無音の音声を使っていなければ見分けられないので止める', late(false, false, 0), 'pause');
+
+  sp(`
+    globalThis.__status = '';
+    renderSpeechStatus = (t) => { globalThis.__status = t; };
+    renderSpeechCurrentCard = () => {};
+    globalThis.__speakArgs = [];
+    speakCurrentEntry = (part) => { __speakArgs.push(part === undefined ? 'title' : part); };
+    globalThis.__timers = [];
+    setTimeout = (fn) => { __timers.push(fn); return __timers.length; };
+    clearTimeout = () => {};
+    globalThis.__synth = { speaking: true, pending: false, paused: false, resumed: 0,
+      speak() {}, cancel() {}, resume() { this.resumed++; }, pause() {} };
+    speechSynthesis = __synth;
+    navigator.audioSession = { type: 'playback' };
+    speechQueue = [{ title: 'T', body: 'B' }];
+    speechIndex = 0;
+    speechSilentAudio = { paused: true, play() { this.paused = false; return Promise.resolve(); }, pause() { this.paused = true; } };
+    document.getElementById('speechBackgroundChk').checked = true; // 「画面オフでも続ける」オン（既定）
+  `);
+  // 話し始めた声が無音の音声を止めた → 声は出続けている → 読み上げを続ける
+  sp('speechIsPlaying = true; speechGapTimer = null; speechPreparing = false; speechPart = "title"; speechSilentAudioConfirmed = true; onSpeechSilentAudioPaused(); __timers.shift()();');
+  eq('読み上げの声が無音の音声を止めただけなら、読み上げを続ける', [sp('speechIsPlaying'), sp('navigator.audioSession.type')], [true, 'playback']);
+  eq('止まった無音の音声は、もうBGMのしるしとして使わない', sp('speechOtherAudioTookOver()'), false);
+  // その後に見張り役が声の止まりを見つけても、「BGMに切り替わった」とは見なさず読み直す
+  sp('__synth.speaking = false; speechStallRetries = 0; speechResumeTried = false; speechWatchdogTick();');
+  eq('見張り役は今の部分から読み直す', [sp('__speakArgs'), sp('speechIsPlaying')], [['title'], true]);
+  // タイトルと本文の間（間を置いている）に止められたら、本文を話し始めるまで待って見分ける
+  sp('__speakArgs.length = 0; __timers.length = 0; speechSilentAudio.paused = true; speechSilentAudioConfirmed = true; speechGapTimer = 7; onSpeechSilentAudioPaused(); __timers.shift()();');
+  eq('間を置いている間は、もう少し見る', [sp('speechIsPlaying'), sp('__timers.length')], [true, 1]);
+  sp('speechGapTimer = null; __synth.speaking = true; __timers.shift()();');
+  eq('本文を話し始めていれば続ける', [sp('speechIsPlaying'), sp('__timers.length')], [true, 0]);
+  // ▶をもう一度押したら、前の見分けは取り消す
+  sp('speechSilentAudioConfirmed = true; __synth.speaking = false; onSpeechSilentAudioPaused(); speechSilentPauseCheckId++; __timers.shift()();');
+  eq('▶を押し直した後の古い見分けでは止めない', sp('speechIsPlaying'), true);
+
+  // しばらく読んだ後に声が切られた：無音の音声が流れたままなら読み直す
+  sp('__speakArgs.length = 0; __timers.length = 0; speechRunId = 9; speechStartedAt = Date.now() - 60000; speechInterruptRetries = 0; speechLateRetries = 0; speechSilentAudio.paused = false; speechSilentAudioConfirmed = true;');
+  sp('handleSpeechUtteranceError({ error: "interrupted" }, 9, "body"); __timers.shift()();');
+  eq('無音の音声が流れたまま声だけ切られたら、切られた部分（本文）から読み直す', [sp('__speakArgs'), sp('speechIsPlaying'), sp('speechLateRetries')], [['body'], true, 1]);
+  sp('speechLateRetries = 0;');
+  // 無音の音声も止められていたら止める（BGMを止め返さない）
+  sp('__speakArgs.length = 0; __timers.length = 0; speechSilentAudio.paused = true; speechSilentAudioConfirmed = true;');
+  sp('handleSpeechUtteranceError({ error: "interrupted" }, 9, "body");');
+  eq('無音の音声も止められていたら、すぐ止める', [sp('__speakArgs.length'), sp('speechIsPlaying'), sp('speechResumePart')], [0, false, 'body']);
+  check('止めた理由を出す', /作業用BGM/.test(sp('__status')), sp('__status'));
+
+  // 読み上げの記録：止まったわけを実機で確かめられる（保存はしない）
+  const log = sp('speechLog');
+  check('記録に止まったわけが残る', log.some(r => /声が切られた/.test(r.msg)) && log.some(r => /読み上げを止めた/.test(r.msg)), JSON.stringify(log.map(r => r.msg)));
+  sp('for (let i = 0; i < 100; i++) speechLogAdd("x" + i);');
+  eq('記録は新しい60件まで', [sp('speechLog.length'), sp('speechLog[speechLog.length - 1].msg')], [60, 'x99']);
+  eq('記録の時刻の書き方（日付に依らない）', sp('speechLogText([{ at: new Date(2026, 0, 2, 3, 4, 5, 678).getTime(), msg: "m" }])'), '03:04:05.6 m');
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  check('読み上げタブに記録の欄がある', /id="speechLogBox"/.test(html) && /id="speechLogList"/.test(html) && /id="speechLogCopyBtn"/.test(html));
   sp('speechIsPlaying = false;');
 }
 

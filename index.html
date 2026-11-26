@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>論証集アプリ v34.3（作業用BGMから読み上げへの切り替えをなめらかに・声の重複を整理）</title>
+<title>論証集アプリ v34.4（BGMから切り替えた後に読み上げがすぐ止まる不具合を修正）</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0057e7">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@ try {
 <script src="vendor/jszip/jszip.min.js"></script><link rel="stylesheet" href="style.css">
 </head>
 <body>
-<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v34.3</span></h1>
+<h1 id="appHomeLink" title="タップでホームに戻る"><span class="appIcon">📚</span><span class="appTitleText">論証集アプリ v34.4</span></h1>
 <div id="status"></div>
 <div id="syncConflictBanner" class="syncConflictBanner"></div>
 <div id="backupReminderBanner" class="backupReminderBanner"></div>
@@ -146,6 +146,11 @@ try {
 <button type="button" id="speechDarkBtn" title="読み上げを続けたまま画面を真っ黒にします（iPadは画面を消すと読み上げが止まるため、その代わりに使います。2回タップで戻ります）">🌑 画面を暗く</button>
 </div>
 <div id="speechCurrentCard" class="speechCurrentCard"></div>
+<details id="speechLogBox" class="speechLogBox"><summary>🔧 読み上げの記録（止まってしまうときの確認用）</summary>
+<p class="speechLogNote">読み上げが止まってしまったときは、ここを開いて画面写真を撮るか「📋 コピー」で貼り付けて知らせてください。止まったわけを調べるのに使います（この端末の中だけの記録で、保存・同期はしません。アプリを閉じると消えます）。</p>
+<button type="button" id="speechLogCopyBtn">📋 コピー</button>
+<pre id="speechLogList" class="speechLogList"></pre>
+</details>
 </div>
 <div id="calendarPage" class="page">
 <div id="trendWrap"></div>

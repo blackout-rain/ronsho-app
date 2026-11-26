@@ -26,6 +26,57 @@ const SPEECH_INTERRUPT_RETRY_MS = 500;
 const SPEECH_MAX_INTERRUPT_RETRIES = 3;
 // 無音の音声が流れ始めてから、話し始めるまでに置く間（音の切り替えが落ち着くのを待つ）
 const SPEECH_AUDIO_SETTLE_MS = 350;
+// しばらく読んだ後に声が切られたとき・無音の音声が止められたときに、ほかのアプリ（作業用BGMなど）
+// に切り替わったのか、この画面の音同士（読み上げの声と無音の音声）がぶつかっただけなのかを
+// 見分けるまでの間。v34.3 では見分けずにすぐ止めていたため、iPadで読み上げの声が無音の音声を
+// 止めた（または逆）だけでも「BGMに切り替わった」と見なし、読み上げがすぐ止まっていた（v34.4で修正）
+const SPEECH_LATE_INTERRUPT_CHECK_MS = 800;
+const SPEECH_MAX_LATE_RETRIES = 3;
+let speechLateRetries = 0;
+const SPEECH_SILENT_PAUSE_CHECK_MS = 1000;
+const SPEECH_SILENT_PAUSE_MAX_WAITS = 3;
+let speechSilentPauseCheckId = 0;
+// 読み上げの記録（止まってしまったわけを実機で確かめるため。この端末のメモリの中だけで、
+// 保存・同期・バックアップはしない）。読み上げタブの「🔧 読み上げの記録」に出す
+const SPEECH_LOG_MAX = 60;
+let speechLog = [];
+function speechLogTime(ms) {
+  const d = new Date(ms);
+  const two = (n) => (n < 10 ? '0' : '') + n;
+  return two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds()) + '.' + Math.floor(d.getMilliseconds() / 100);
+}
+function speechLogText(log) {
+  return log.map(r => speechLogTime(r.at) + ' ' + r.msg).join('\n');
+}
+function speechLogAdd(msg) {
+  speechLog.push({ at: Date.now(), msg: String(msg) });
+  if (speechLog.length > SPEECH_LOG_MAX) speechLog.splice(0, speechLog.length - SPEECH_LOG_MAX);
+  renderSpeechLog();
+}
+function renderSpeechLog() {
+  try {
+    const box = document.getElementById('speechLogBox');
+    const el = document.getElementById('speechLogList');
+    if (!box || !el || box.open !== true) return;
+    el.textContent = speechLog.length ? speechLogText(speechLog) : '（まだ記録はありません。▶ 再生を押すと記録が始まります）';
+  } catch (e) {}
+}
+function speechPartLabel(part) {
+  return part === 'body' ? '本文' : 'タイトル';
+}
+// 今の音の様子（記録用）：音の種類・無音の音声・読み上げの状態
+function speechAudioStateText() {
+  const parts = [];
+  try {
+    if (typeof navigator !== 'undefined' && navigator.audioSession) parts.push('音の種類=' + navigator.audioSession.type);
+  } catch (e) {}
+  parts.push('無音の音声=' + (!speechSilentAudio ? 'なし' : (speechSilentAudio.paused === false ? '流れている' : '止まっている')));
+  try {
+    const synth = window.speechSynthesis;
+    if (synth) parts.push('声=' + (synth.paused ? '一時停止' : synth.speaking ? '話している' : synth.pending ? '待ち' : '黙っている'));
+  } catch (e) {}
+  return parts.join('・');
+}
 // 画面を真っ黒にしている最中か（下の「画面を真っ黒にするモード」で使う。ほかの関数からも見るため先に宣言する）
 let speechDarkOpen = false;
 // 真っ黒の間は見えない読み上げ画面を描き直さず、戻ったときに1回だけ描き直す
@@ -128,17 +179,26 @@ function speechWatchdogTick() {
   }
   if (speechOtherAudioTookOver()) {
     // ほかのアプリ（作業用BGMなど）が音を使い始めた。読み直すとその音を止めてしまうので、止める
+    speechLogAdd('見張り役：声が止まっていて、無音の音声も止められている（' + speechAudioStateText() + '）');
     pauseSpeechByOtherAudio();
     return;
   }
   if (synth.paused && !speechResumeTried) {
     speechResumeTried = true;
+    speechLogAdd('見張り役：一時停止で固まっていたので再開する');
     try { synth.resume(); } catch (e) {}
     return;
   }
   speechResumeTried = false;
-  if (speechStallRetries >= SPEECH_MAX_STALL_RETRIES) return;
+  if (speechStallRetries >= SPEECH_MAX_STALL_RETRIES) {
+    if (speechStallRetries === SPEECH_MAX_STALL_RETRIES) {
+      speechStallRetries++;
+      speechLogAdd('見張り役：声が止まったまま。読み直しは2回までなので、これ以上読み直さない（' + speechAudioStateText() + '）');
+    }
+    return;
+  }
   speechStallRetries++;
+  speechLogAdd('見張り役：声が止まっていたので' + speechPartLabel(speechPart) + 'から読み直す（' + speechAudioStateText() + '）');
   speakCurrentEntry(speechPart);
 }
 function startSpeechKeepAlive() {
@@ -349,10 +409,48 @@ const SPEECH_AUDIO_READY_MAX_MS = 1500;
 let speechSilentAudioConfirmed = false;
 function onSpeechSilentAudioPlaying() {
   speechSilentAudioConfirmed = true;
+  if (speechIsPlaying) speechLogAdd('無音の音声が流れ始めた');
+}
+// 無音の音声が止められたあと、読み上げの声の様子から次の手を決める。
+// 'wait'＝間を置いている・準備中なのでもう少し見る、'keep'＝声は出続けている（読み上げの声が
+// 無音の音声を止めただけ。iPadでは声と無音の音声が音を取り合うことがある）、'pause'＝声も止まった
+// （ほかのアプリが音を使い始めた）
+function speechSilentPauseVerdict(synth, waiting) {
+  if (waiting) return 'wait';
+  if (!synth) return 'pause';
+  if (synth.speaking && !synth.paused) return 'keep';
+  if (synth.pending && !synth.paused) return 'wait';
+  return 'pause';
 }
 function onSpeechSilentAudioPaused() {
   if (!speechOtherAudioTookOver()) return;
-  pauseSpeechByOtherAudio();
+  speechLogAdd('無音の音声が止められた（' + speechAudioStateText() + '）');
+  // すぐには止めない。少し待って、読み上げの声も止まっていたときだけ止める
+  const id = ++speechSilentPauseCheckId;
+  let waits = 0;
+  const check = () => {
+    if (id !== speechSilentPauseCheckId || !speechOtherAudioTookOver()) return;
+    let v = speechSilentPauseVerdict(window.speechSynthesis, !!(speechGapTimer || speechPreparing));
+    if (v === 'wait') {
+      if (waits < SPEECH_SILENT_PAUSE_MAX_WAITS) {
+        waits++;
+        setTimeout(check, SPEECH_SILENT_PAUSE_CHECK_MS);
+        return;
+      }
+      v = speechSilentPauseVerdict(window.speechSynthesis, false);
+      if (v === 'wait') v = 'pause';
+    }
+    if (v === 'keep') {
+      // 声は出続けているので、ほかのアプリに切り替わったのではない。読み上げを続ける。
+      // 無音の音声が止まっていることは、もう「BGMに切り替わった」しるしとしては使わない
+      speechSilentAudioConfirmed = false;
+      speechLogAdd('声は出続けているので、読み上げを続ける');
+      return;
+    }
+    speechLogAdd('声も止まっている（' + speechAudioStateText() + '）');
+    pauseSpeechByOtherAudio();
+  };
+  setTimeout(check, SPEECH_SILENT_PAUSE_CHECK_MS);
 }
 function speechOtherAudioTookOver() {
   return !!(speechIsPlaying && speechSilentAudio && speechSilentAudioConfirmed && speechSilentAudio.paused === true);
@@ -679,14 +777,17 @@ function recoverStalledSpeech() {
   if (speechQueue.length === 0) return;
   if (speechOtherAudioTookOver()) {
     // 作業用BGMなどに切り替えて戻ってきたときは、勝手に読み直してBGMを止めない
+    speechLogAdd('画面に戻ったら声も無音の音声も止まっていた（' + speechAudioStateText() + '）');
     pauseSpeechByOtherAudio();
     return;
   }
+  speechLogAdd('画面に戻ったら声が止まっていたので' + speechPartLabel(speechPart) + 'から読み直す');
   speechStallRetries = 0;
   startSpeechBackgroundAudio();
   speakCurrentEntry(speechPart);
 }
 document.addEventListener('visibilitychange', () => {
+  if (speechIsPlaying) speechLogAdd(document.visibilityState === 'visible' ? '画面に戻った' : '画面から離れた（ほかのアプリ・画面オフ）');
   if (document.visibilityState !== 'visible' || !speechIsPlaying) return;
   if (!speechWakeLock) acquireSpeechWakeLock();
   setTimeout(recoverStalledSpeech, 1000);
@@ -875,6 +976,7 @@ function renderSpeechCurrentCard() {
 function advanceSpeechAfterEntry() {
   if (!speechIsPlaying) return;
   speechStallRetries = 0;
+  speechLateRetries = 0;
   const loopSel = document.getElementById('speechLoopSelect');
   const loopMode = loopSel ? loopSel.value : 'none';
   if (loopMode === 'one') {
@@ -893,9 +995,24 @@ function advanceSpeechAfterEntry() {
     renderSpeechStatus('🎉 すべて読み上げが終了しました。');
   }
 }
+// 声が切られたとき：▶の直後（音の切り替えのせい）ならすぐ読み直す（'retry'）。それ以外は、
+// 少し待ってから、ほかのアプリに切り替わったのかを見分ける（'check'）
 function speechInterruptAction(now, startedAt, retries) {
   if (now - startedAt <= SPEECH_START_WINDOW_MS && retries < SPEECH_MAX_INTERRUPT_RETRIES) return 'retry';
+  return 'check';
+}
+// しばらく読んだ後に声が切られて、少し待った後の判断。無音の音声が止められていれば、ほかの
+// アプリ（作業用BGMなど）に切り替わったので止める（'pause'）。無音の音声が流れたままなら、
+// ほかのアプリではなく、この画面の無音の音声が流れ直したときに声が切られただけなので、
+// 切られた部分から読み直す（'retry'。1つの論証で3回まで）。無音の音声を使っていない
+// （「画面オフでも続ける」を外している）ときは見分けられないので止める
+function speechLateInterruptVerdict(tookOver, silentPlaying, retries) {
+  if (tookOver) return 'pause';
+  if (silentPlaying && retries < SPEECH_MAX_LATE_RETRIES) return 'retry';
   return 'pause';
+}
+function speechSilentAudioPlayingNow() {
+  return !!(speechBackgroundEnabled() && speechSilentAudio && speechSilentAudio.paused === false);
 }
 function stopSpeechWithError() {
   speechIsPlaying = false;
@@ -910,23 +1027,42 @@ function stopSpeechWithError() {
 function handleSpeechUtteranceError(evt, runId, part) {
   if (runId !== speechRunId || !speechIsPlaying) return;
   const err = evt && evt.error;
+  speechLogAdd('声が切られた（' + speechPartLabel(part) + '・' + String(err) + '・▶から' + Math.round((Date.now() - speechStartedAt) / 1000) + '秒・' + speechAudioStateText() + '）');
   if (err !== 'interrupted' && err !== 'canceled') {
     stopSpeechWithError();
     return;
   }
-  if (speechOtherAudioTookOver() || speechInterruptAction(Date.now(), speechStartedAt, speechInterruptRetries) === 'pause') {
+  if (speechOtherAudioTookOver()) {
     pauseSpeechByOtherAudio(part);
     return;
   }
-  speechInterruptRetries++;
+  if (speechInterruptAction(Date.now(), speechStartedAt, speechInterruptRetries) === 'retry') {
+    speechInterruptRetries++;
+    speechLogAdd('▶の直後なので' + speechPartLabel(part) + 'から読み直す');
+    scheduleSpeechGap(() => {
+      if (speechIsPlaying && runId === speechRunId) speakCurrentEntry(part);
+    }, SPEECH_INTERRUPT_RETRY_MS);
+    return;
+  }
+  // 少し待ってから見分ける（この間は「間を置いている」扱いなので、見張り役は読み直さない）
   scheduleSpeechGap(() => {
-    if (speechIsPlaying && runId === speechRunId) speakCurrentEntry(part);
-  }, SPEECH_INTERRUPT_RETRY_MS);
+    if (!speechIsPlaying || runId !== speechRunId) return;
+    const v = speechLateInterruptVerdict(speechOtherAudioTookOver(), speechSilentAudioPlayingNow(), speechLateRetries);
+    if (v === 'retry') {
+      speechLateRetries++;
+      speechLogAdd('無音の音声は流れたまま（ほかのアプリではない）ので、' + speechPartLabel(part) + 'から読み直す');
+      speakCurrentEntry(part);
+      return;
+    }
+    speechLogAdd('ほかのアプリに切り替わったと見なす（' + speechAudioStateText() + '）');
+    pauseSpeechByOtherAudio(part);
+  }, SPEECH_LATE_INTERRUPT_CHECK_MS);
 }
 // ほかのアプリ（作業用BGMなど）が音を使い始めたので、読み上げを止める。▶を押すと、
 // 止めたときに読んでいた部分（タイトル・本文）の頭から読む
 function pauseSpeechByOtherAudio(part) {
   if (!speechIsPlaying) return;
+  speechLogAdd('⏸ 読み上げを止めた（ほかのアプリの音に切り替わったと見なした）');
   speechResumePart = part || speechPart;
   speechIsPlaying = false;
   speechPreparing = false;
@@ -963,8 +1099,10 @@ function speakCurrentEntry(startPart) {
     // 読み上げ中に声を選び直したときも、本文から新しい声になるよう、ここで当てる
     applySpeechVoice(bodyUtterance);
     bodyUtterance.rate = rate;
+    bodyUtterance.onstart = () => { if (runId === speechRunId) speechLogAdd('話し始めた（本文）'); };
     bodyUtterance.onend = () => {
       if (runId !== speechRunId) return;
+      speechLogAdd('読み終わった（本文）');
       advanceSpeechAfterEntry();
     };
     bodyUtterance.onerror = (evt) => handleSpeechUtteranceError(evt, runId, 'body');
@@ -981,8 +1119,10 @@ function speakCurrentEntry(startPart) {
   const titleUtterance = new SpeechSynthesisUtterance(speechTextFor(e.title));
   applySpeechVoice(titleUtterance);
   titleUtterance.rate = rate;
+  titleUtterance.onstart = () => { if (runId === speechRunId) speechLogAdd('話し始めた（タイトル）'); };
   titleUtterance.onend = () => {
     if (!speechIsPlaying || runId !== speechRunId) return;
+    speechLogAdd('読み終わった（タイトル）');
     scheduleSpeechGap(speakBody, SPEECH_TITLE_BODY_PAUSE_MS);
   };
   titleUtterance.onerror = (evt) => handleSpeechUtteranceError(evt, runId, 'title');
@@ -1007,8 +1147,11 @@ function startSpeech() {
   acquireSpeechWakeLock();
   speechStallRetries = 0;
   speechInterruptRetries = 0;
+  speechLateRetries = 0;
   speechResumeTried = false;
   speechStartedAt = Date.now();
+  speechSilentPauseCheckId++;
+  speechLogAdd('▶ 再生を押した（' + speechAudioStateText() + '）');
   // 一時停止から続ける（ほかのアプリの音で止めたときは、止めた部分の頭から読み直す）
   const resumePaused = !speechResumePart && speechQueue.length > 0 && synth.paused && (synth.speaking || synth.pending);
   if (!resumePaused) {
@@ -1059,6 +1202,7 @@ function startSpeech() {
   ready.then(() => {
     setTimeout(() => {
       if (prepareId !== speechPrepareId || !speechPreparing || !speechIsPlaying) return;
+      speechLogAdd('準備ができた（' + speechAudioStateText() + '）');
       speechPreparing = false;
       go();
     }, SPEECH_AUDIO_SETTLE_MS);
@@ -1066,6 +1210,7 @@ function startSpeech() {
 }
 function pauseSpeech() {
   if (!speechSupported()) return;
+  if (speechIsPlaying) speechLogAdd('⏸ 一時停止を押した');
   speechIsPlaying = false;
   speechPreparing = false;
   clearSpeechGapTimer();
@@ -1077,6 +1222,7 @@ function pauseSpeech() {
 }
 function stopSpeech() {
   if (!speechSupported()) return;
+  if (speechIsPlaying) speechLogAdd('⏹ 停止した');
   speechIsPlaying = false;
   speechPreparing = false;
   speechResumePart = null;
@@ -1107,6 +1253,21 @@ function speechStep(delta) {
     speakCurrentEntry();
   }
 }
+(function setupSpeechLogBox() {
+  const box = document.getElementById('speechLogBox');
+  if (!box || !box.addEventListener) return;
+  box.addEventListener('toggle', renderSpeechLog);
+  const copyBtn = document.getElementById('speechLogCopyBtn');
+  if (copyBtn && copyBtn.addEventListener) {
+    copyBtn.addEventListener('click', () => {
+      const text = speechLogText(speechLog);
+      const done = () => { copyBtn.textContent = '✅ コピーしました'; setTimeout(() => { copyBtn.textContent = '📋 コピー'; }, 2000); };
+      try {
+        navigator.clipboard.writeText(text).then(done, () => { copyBtn.textContent = '⚠ コピーできませんでした'; });
+      } catch (e) { copyBtn.textContent = '⚠ コピーできませんでした'; }
+    });
+  }
+})();
 document.getElementById('speechPlayBtn').addEventListener('click', startSpeech);
 document.getElementById('speechPauseBtn').addEventListener('click', pauseSpeech);
 document.getElementById('speechStopBtn').addEventListener('click', stopSpeech);

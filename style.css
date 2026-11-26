@@ -1513,6 +1513,11 @@ input[type=file] { display:none; }
   cursor: pointer;
 }
 .speechButtonRow button:hover { background: var(--tint-1); }
+.speechLogBox { margin-top: 16px; font-size: 12px; color: var(--text-secondary2); }
+.speechLogBox summary { cursor: pointer; }
+.speechLogNote { margin: 6px 0; line-height: 1.6; }
+.speechLogBox button { font-size: 12px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--card-bg); color: inherit; cursor: pointer; }
+.speechLogList { white-space: pre-wrap; word-break: break-all; font-size: 11px; line-height: 1.5; max-height: 320px; overflow-y: auto; background: var(--card-bg); border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px; margin-top: 6px; }
 #speechPlayBtn { background: linear-gradient(135deg, #0057e7, #00c2ff); color: #fff; border: none; }
 /* 画面を真っ黒にするモード（読み上げは続けたまま、画面オフの代わりにする） */
 .speechDarkOverlay {
